@@ -2,7 +2,7 @@
 // design uses are imported, so the bundle stays small. Add a name here when a screen needs a new one.
 import {
   ArrowLeft,
-  Battery,
+  BatteryFull,
   CalendarDays,
   Camera,
   Check,
@@ -15,6 +15,7 @@ import {
   Footprints,
   Hourglass,
   House,
+  Info,
   LifeBuoy,
   MapPin,
   Moon,
@@ -35,7 +36,7 @@ import React from 'react';
 
 const ICONS = {
   'arrow-left': ArrowLeft,
-  battery: Battery,
+  'battery-full': BatteryFull,
   'calendar-days': CalendarDays,
   camera: Camera,
   check: Check,
@@ -48,6 +49,7 @@ const ICONS = {
   footprints: Footprints,
   hourglass: Hourglass,
   house: House,
+  info: Info,
   'life-buoy': LifeBuoy,
   'map-pin': MapPin,
   moon: Moon,

@@ -101,21 +101,25 @@ function Cloud({ spec, color, opacity, quiet, reduced }: { spec: CloudSpec; colo
   );
 }
 
-function Stars({ count, reduced }: { count: number; reduced: boolean }) {
-  const twinkle = useSway(3, 0, reduced);
-  const opacity = twinkle.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+/** One star. As in the design, each twinkles on its own (opacity .25 -> 1 -> .25 over 2.5-5.5 s, own delay). */
+function Star({ i, reduced }: { i: number; reduced: boolean }) {
+  const size = 1 + rand(i, 3) * 2;
+  const twinkle = useSway((2.5 + rand(i, 4) * 3) / 2, rand(i, 5) * 3, reduced);
+  const opacity = twinkle.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] });
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
-      {Array.from({ length: count }, (_, i) => {
-        const size = 1 + rand(i, 3) * 2;
-        return (
-          <View
-            key={i}
-            style={{ position: 'absolute', left: `${rand(i, 1) * 100}%`, top: `${rand(i, 2) * 62}%`, width: size, height: size, borderRadius: 9, backgroundColor: '#fff', opacity: 0.7 }}
-          />
-        );
-      })}
-    </Animated.View>
+    <Animated.View
+      style={{ position: 'absolute', left: `${rand(i, 1) * 100}%`, top: `${rand(i, 2) * 62}%`, width: size, height: size, borderRadius: 9, backgroundColor: '#fff', opacity: reduced ? 0.7 : opacity }}
+    />
+  );
+}
+
+function Stars({ count, reduced }: { count: number; reduced: boolean }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {Array.from({ length: count }, (_, i) => (
+        <Star key={i} i={i} reduced={reduced} />
+      ))}
+    </View>
   );
 }
 
@@ -138,34 +142,58 @@ function Orb({ right, top, size, stops, glow, glowSize, id }: { right: number; t
   );
 }
 
-function Rain({ width, height, calm, reduced }: { width: number; height: number; calm: number; reduced: boolean }) {
+/** A value that eases to `target` over `ms` (the design's `transition: opacity 1s linear`). */
+function useEased(target: number, ms: number, reduced: boolean) {
+  const v = useRef(new Animated.Value(target)).current;
+  useEffect(() => {
+    if (reduced) {
+      v.setValue(target);
+      return;
+    }
+    Animated.timing(v, { toValue: target, duration: ms, easing: Easing.linear, useNativeDriver: USE_NATIVE_DRIVER }).start();
+  }, [target, ms, reduced, v]);
+  return v;
+}
+
+/** One raindrop. As in the design, each has its own speed (0.8-1.3 s) and start delay (0-1.2 s). */
+function Drop({ i, x, len, height, reduced }: { i: number; x: number; len: number; height: number; reduced: boolean }) {
   const fall = useRef(new Animated.Value(0)).current;
+  const dur = (0.8 + rand(i, 10) * 0.5) * 1000;
   useEffect(() => {
     if (reduced || height <= 0) return;
     fall.setValue(0);
-    const loop = Animated.loop(Animated.timing(fall, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: USE_NATIVE_DRIVER }));
-    loop.start();
-    return () => loop.stop();
-  }, [reduced, height, fall]);
-
-  const count = Math.round(30 * (1 - calm * 0.85));
-  const drops = useMemo(
-    () => Array.from({ length: count }, (_, i) => ({ x: rand(i, 7) * (width + 8) - 4, y: rand(i, 8) * height, len: 16 + rand(i, 9) * 10 })),
-    [count, width, height],
-  );
-  // Two copies one screen-height apart; sliding by exactly one height makes the loop seamless.
-  const translateY = fall.interpolate({ inputRange: [0, 1], outputRange: [-height, 0] });
-  const layer = (offset: number) =>
-    drops.map((d, i) => (
-      <View
-        key={`${offset}-${i}`}
-        style={{ position: 'absolute', left: d.x, top: d.y + offset, width: 1.5, height: d.len, borderRadius: 2, backgroundColor: 'rgba(214,208,255,.55)', transform: [{ rotate: '14deg' }] }}
-      />
-    ));
+    const loop = Animated.loop(Animated.timing(fall, { toValue: 1, duration: dur, easing: Easing.linear, useNativeDriver: USE_NATIVE_DRIVER }));
+    const t = setTimeout(() => loop.start(), rand(i, 11) * 1200);
+    return () => {
+      clearTimeout(t);
+      loop.stop();
+    };
+  }, [reduced, height, dur, i, fall]);
+  const translateY = fall.interpolate({ inputRange: [0, 1], outputRange: [-0.1 * height, 1.1 * height] });
   return (
-    <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: height * 2, opacity: 1 - calm * 0.6, transform: reduced ? [] : [{ translateY }] }}>
-      {layer(0)}
-      {!reduced && layer(height)}
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: x,
+        top: reduced ? rand(i, 8) * height : 0,
+        width: 1.5,
+        height: len,
+        borderRadius: 2,
+        backgroundColor: 'rgba(214,208,255,.55)',
+        transform: reduced ? [{ rotate: '14deg' }] : [{ translateY }, { rotate: '14deg' }],
+      }}
+    />
+  );
+}
+
+function Rain({ width, height, calm, reduced }: { width: number; height: number; calm: number; reduced: boolean }) {
+  const count = Math.round(30 * (1 - calm * 0.85));
+  const opacity = useEased(1 - calm * 0.6, 1000, reduced);
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]}>
+      {Array.from({ length: count }, (_, i) => (
+        <Drop key={i} i={i} x={rand(i, 7) * (width + 8) - 4} len={16 + rand(i, 9) * 10} height={height} reduced={reduced} />
+      ))}
     </Animated.View>
   );
 }
@@ -200,6 +228,7 @@ export function SkyScene({ posture, mode, calm = 0, quiet = false, flash = true,
   const meteredSky = SKY[m].metered;
   const isQuiet = quiet && posture !== 'sealed';
   const palette = CLOUD_COLORS[m][posture];
+  const calmOpacity = useEased(c * 0.75, 1000, reduced);
 
   return (
     <View
@@ -220,8 +249,9 @@ export function SkyScene({ posture, mode, calm = 0, quiet = false, flash = true,
         </Defs>
         <Rect width="100%" height="100%" fill={`url(#g${uid})`} />
       </Svg>
-      {posture === 'sealed' && c > 0 && (
-        <Svg width="100%" height="100%" style={[StyleSheet.absoluteFill, { opacity: c * 0.75 }]}>
+      {posture === 'sealed' && (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: calmOpacity }]}>
+        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
           <Defs>
             <LinearGradient id={`m${uid}`} x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={meteredSky.top} />
@@ -230,6 +260,7 @@ export function SkyScene({ posture, mode, calm = 0, quiet = false, flash = true,
           </Defs>
           <Rect width="100%" height="100%" fill={`url(#m${uid})`} />
         </Svg>
+        </Animated.View>
       )}
 
       {dark && <Stars count={posture === 'open' ? 34 : posture === 'metered' ? 16 : 8} reduced={reduced} />}
@@ -238,7 +269,7 @@ export function SkyScene({ posture, mode, calm = 0, quiet = false, flash = true,
         <Orb id={`s${uid}`} right={30} top={54} size={86} stops={['#fff2b8', '#ffd25a', '#ffbf3a']} glow="rgba(255,214,102,.22)" glowSize={14} />
       )}
       {posture === 'open' && dark && (
-        <Orb id={`o${uid}`} right={40} top={60} size={58} stops={['#fffbea', '#efe6c6', '#d9cfa9']} glow="rgba(240,230,190,.16)" glowSize={18} />
+        <Orb id={`o${uid}`} right={40} top={60} size={58} stops={['#fffbea', '#efe6c6', '#d9cfa9']} glow="rgba(240,230,190,.08)" glowSize={12} />
       )}
       {posture === 'metered' && !dark && (
         <View pointerEvents="none" style={{ position: 'absolute', right: 46, top: 56, width: 70, height: 70, borderRadius: 99, backgroundColor: '#fbe3a6', opacity: 0.55 }} />

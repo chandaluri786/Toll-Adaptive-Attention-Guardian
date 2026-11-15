@@ -91,9 +91,9 @@ function StatusBar({ mode, light }: { mode: ThemeMode; light: boolean }) {
     <View pointerEvents="none" style={styles.statusBar}>
       <Text style={{ color: ink, fontSize: 14, fontFamily: fonts.medium }}>10:14</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-        <Icon name="signal" size={14} color={ink} strokeWidth={2.2} />
-        <Icon name="wifi" size={14} color={ink} strokeWidth={2.2} />
-        <Icon name="battery" size={16} color={ink} strokeWidth={2.2} />
+        <Icon name="signal" size={15} color={ink} strokeWidth={2.2} />
+        <Icon name="wifi" size={15} color={ink} strokeWidth={2.2} />
+        <Icon name="battery-full" size={17} color={ink} strokeWidth={2.2} />
       </View>
     </View>
   );

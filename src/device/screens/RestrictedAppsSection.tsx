@@ -6,10 +6,11 @@
 // the default export connects it to the app config and installed-app list.
 import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { Icon } from '../../ui/Icon';
 import services, { device } from '../../services';
 import { useTheme } from '../../ui/components';
 import { Body, ChoiceRow, SectionLabel } from '../../ui/primitives';
-import { space } from '../../ui/theme';
+import { fonts, space } from '../../ui/theme';
 import { MIN } from '../../shared/emitter';
 import { MAX_MESSAGING_APPS } from '../policy';
 import type { InstalledApp } from '../ports';
@@ -59,7 +60,10 @@ export function RestrictedAppsSectionView(p: RestrictedAppsViewProps) {
           />
         );
       })}
-      <Body muted small>Adding is instant. Removing one takes 12 hours.</Body>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="info" size={16} color={t.muted} />
+        <Text style={{ flex: 1, color: t.muted, fontSize: 14, fontFamily: fonts.body }}>Adding is instant. Removing one takes 12 hours.</Text>
+      </View>
 
       <SectionLabel>Add an app</SectionLabel>
       {notRestricted.map((a) => (

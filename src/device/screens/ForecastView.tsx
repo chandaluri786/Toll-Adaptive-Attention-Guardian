@@ -138,9 +138,10 @@ function Ready({ model }: { model: Extract<ForecastModel, { state: 'ready' }> })
           <Body muted small>None in this range.</Body>
         ) : (
           unlocks.map((u) => (
-            <View key={u.at} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Body small>{u.date}</Body>
-              <Body small muted>{fmtClock(u.at)}</Body>
+            <View key={u.at} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40, borderTopWidth: 1, borderTopColor: t.divider }}>
+              <Icon name="life-buoy" size={18} color={t.muted} />
+              <Text style={{ flex: 1, color: t.text, fontSize: 15, fontFamily: fonts.body }}>{u.date}</Text>
+              <Text style={{ color: t.muted, fontSize: 15, fontFamily: fonts.body }}>{fmtClock(u.at)}</Text>
             </View>
           ))
         )}

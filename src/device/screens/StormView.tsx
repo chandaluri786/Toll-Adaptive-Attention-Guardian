@@ -7,11 +7,12 @@
 //
 // Strict order (planning doc, UI): 1. the weather and why  2. umbrella time  3. the choices.
 // The mascot is deliberately NOT here: on this screen it stays out of the way.
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Posture } from '../../contracts';
 import { WeatherChip, useSky, useTheme, useThemeMode } from '../../ui/components';
 import { Icon } from '../../ui/Icon';
+import { useOpenIn, useReducedMotion } from '../../ui/motion';
 import { SkyScene } from '../../ui/SkyScene';
 import { fonts, radius } from '../../ui/theme';
 import { SPEND_MINUTES, type Door, type EmergencyStep, type StormViewModel, openedViewModel } from '../stormViewModel';
@@ -131,7 +132,7 @@ function DoorButton({ door, posture, onPress }: { door: Door; posture: Posture; 
       onPress={onPress}
       style={[styles.door, { backgroundColor: bg, borderColor: border, borderStyle: disabled ? 'dashed' : 'solid' }]}
     >
-      {door.fill > 0 && <View style={[StyleSheet.absoluteFill, { right: undefined, width: `${door.fill * 100}%`, backgroundColor: fillBg }]} />}
+      {door.fill > 0 && <Fill fraction={door.fill} color={fillBg} />}
       <View style={[styles.doorIcon, { backgroundColor: iconBg }]}>
         <Icon name={door.icon} size={21} color={color} />
       </View>
@@ -141,6 +142,16 @@ function DoorButton({ door, posture, onPress }: { door: Door; posture: Posture; 
       </View>
     </Pressable>
   );
+}
+
+/** The wait's progress behind a door. The design eases the width over .25 s (`transition: width .25s linear`). */
+function Fill({ fraction, color }: { fraction: number; color: string }) {
+  const w = useRef(new Animated.Value(fraction)).current;
+  useEffect(() => {
+    Animated.timing(w, { toValue: fraction, duration: 250, easing: Easing.linear, useNativeDriver: false }).start();
+  }, [fraction, w]);
+  const width = w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+  return <Animated.View style={[StyleSheet.absoluteFill, { right: undefined, width, backgroundColor: color }]} />;
 }
 
 /** The plain link, its step-2 panel, or the "already used" line. Two taps plus a confirm. */
@@ -220,10 +231,13 @@ export function GatherBanner({ title, body, topInset = 0, onDismiss }: { title: 
 function OpenedScreen({ opened, onOpenApp }: { opened: NonNullable<StormViewProps['opened']>; onOpenApp: () => void }) {
   const t = useTheme();
   const sky = useSky(opened.weather);
+  const popIn = useOpenIn(useReducedMotion());
   return (
     <View style={[styles.fill, styles.opened]}>
       <SkyScene posture={opened.weather} quiet />
-      <Icon name={opened.icon} size={112} color={t.gold} strokeWidth={1.5} />
+      <Animated.View style={popIn}>
+        <Icon name={opened.icon} size={112} color={t.gold} strokeWidth={1.5} />
+      </Animated.View>
       <Text style={[styles.openedTitle, { color: sky.on }]}>{opened.title}</Text>
       <Text style={[styles.openedSub, { color: sky.onMuted }]}>{opened.sub}</Text>
       <Pressable accessibilityRole="button" onPress={onOpenApp} style={[styles.openApp, { backgroundColor: t.primaryBg }]}>

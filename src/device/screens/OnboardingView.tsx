@@ -185,7 +185,10 @@ function Apps(p: OnboardingViewProps) {
           <AppTile key={a.pkg} app={a} selected={p.restricted.has(a.pkg)} onPress={() => p.onToggleRestricted(a.pkg)} />
         ))}
       </View>
-      <Body muted small>Adding is instant. Removing one takes 12 hours.</Body>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="info" size={16} color={t.muted} />
+        <Text style={{ flex: 1, color: t.muted, fontSize: 14, fontFamily: fonts.body }}>Adding is instant. Removing one takes 12 hours.</Text>
+      </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
         <Text style={{ color: t.text, fontSize: 17, fontFamily: fonts.medium }}>Always-open messaging</Text>
@@ -211,8 +214,9 @@ function Apps(p: OnboardingViewProps) {
       </View>
       <Body muted small>Calls, SMS, maps, banking, health, camera, clock and settings are always open too.</Body>
 
-      <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: t.text, fontSize: 16, fontFamily: fonts.body }}>{`Sleep ${p.sleepLabel}`}</Text>
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Icon name="moon" size={20} color={t.muted} />
+        <Text style={{ flex: 1, color: t.text, fontSize: 16, fontFamily: fonts.body }}>{`Sleep ${p.sleepLabel}`}</Text>
         <Text style={{ color: t.goldText, fontSize: 15, fontFamily: fonts.medium }}>Change</Text>
       </Card>
     </View>

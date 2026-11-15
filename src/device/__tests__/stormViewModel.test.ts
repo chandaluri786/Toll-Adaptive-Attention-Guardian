@@ -171,3 +171,17 @@ describe('emergency unlock: two taps plus a confirm', () => {
     expect(nextEmergencyStep('done', 'cancel')).toBe('done');
   });
 });
+
+describe('the wait with fractional seconds (ticked every 250 ms)', () => {
+  const base = { posture: 'sealed' as const, reason: 'r', grace: false, appName: 'Scrollr', trigger: 'opened' as const, balance: 4, emergencyLeft: 1, clearsAt: '11:00' };
+  it('shows whole seconds in the title and a smooth fill', () => {
+    const vm = stormViewModel({ ...base, waitLeft: 37.25 });
+    const wait = vm.doors.find((d) => d.key === 'wait')!;
+    expect(wait.title).toBe('Breathe\u2026 0:37');
+    expect(wait.fill).toBeCloseTo((60 - 37.25) / 60, 5);
+  });
+  it('ends on "That\'s a minute" only at exactly 0', () => {
+    expect(stormViewModel({ ...base, waitLeft: 0.2 }).doors.find((d) => d.key === 'wait')!.title).toBe('Breathe\u2026 0:00');
+    expect(stormViewModel({ ...base, waitLeft: 0 }).doors.find((d) => d.key === 'wait')!.title).toBe("That's a minute");
+  });
+});

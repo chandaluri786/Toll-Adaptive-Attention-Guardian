@@ -75,22 +75,20 @@ export default function StormScreen({ appName, pkg, reason }: { appName?: string
     decision,
   });
 
-  // "Wait 60 seconds": count down once a second. It stops at 0 ("That's a minute") and the user chooses.
+  // "Wait 60 seconds": counts down from a start time, refreshed every 250 ms like the design, so the progress
+  // fill and the Storm's calming are smooth. It stops at 0 ("That's a minute") and the user chooses.
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
   const startWait = () => {
     if (waitLeft !== null && waitLeft > 0) return; // already counting
     setWaitLeft(WAIT_SECONDS);
     if (timer.current) clearInterval(timer.current);
+    const started = Date.now(); // real time on purpose: the wait is a human pause, not the demo clock
     timer.current = setInterval(() => {
-      setWaitLeft((left) => {
-        if (left === null || left <= 1) {
-          if (timer.current) clearInterval(timer.current);
-          return 0;
-        }
-        return left - 1;
-      });
-    }, 1000);
+      const left = Math.max(0, WAIT_SECONDS - (Date.now() - started) / 1000);
+      if (left <= 0 && timer.current) clearInterval(timer.current);
+      setWaitLeft(left);
+    }, 250);
   };
 
   // A quest passing in a Storm opens a window: show that it is open, then let the user go back.
