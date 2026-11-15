@@ -19,11 +19,18 @@ function createMMKVKV(): KV {
   };
 }
 
+let dayKV: KV | null = null;
 let plannerStore: PlannerStore | null = null;
+
+/** The one MMKV-backed `day:` store (planner state and quest engine state share it). */
+export function getDayKV(): KV {
+  if (!dayKV) dayKV = createMMKVKV();
+  return dayKV;
+}
 
 /** Created on first use; time always comes from the shared Clock so the demo panel can move it. */
 export function getPlannerStore(): PlannerStore {
-  if (!plannerStore) plannerStore = createPlannerStore({ kv: createMMKVKV(), now: () => services.clock.now() });
+  if (!plannerStore) plannerStore = createPlannerStore({ kv: getDayKV(), now: () => services.clock.now() });
   return plannerStore;
 }
 

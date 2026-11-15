@@ -29,3 +29,26 @@ export function createPedometerStepSource(): StepSource {
     },
   };
 }
+
+/**
+ * The step source the real day module uses: asks for step access first, then watches the
+ * pedometer. Without access it simply never reports (the engine treats the pedometer as silent).
+ */
+export function createPermittedStepSource(): StepSource {
+  const inner = createPedometerStepSource();
+  return {
+    subscribe(fn) {
+      let cancelled = false;
+      let unsub: (() => void) | null = null;
+      requestStepAccess()
+        .then((granted) => {
+          if (granted && !cancelled) unsub = inner.subscribe(fn);
+        })
+        .catch((e) => console.warn('[day] step access check failed', e));
+      return () => {
+        cancelled = true;
+        unsub?.();
+      };
+    },
+  };
+}
