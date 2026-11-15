@@ -110,6 +110,17 @@ describe('opening the sheet', () => {
     expect(phase).toEqual({ kind: 'offer', type: 'place', taskId, error: null });
   });
 
+  test('picking the chip of a quest already running resumes it (no dead end)', () => {
+    // Arrange
+    const { port, engine } = engineSetup();
+    engine.accept('focus');
+    // Act
+    const phase = pickOffer('focus', port.live());
+    // Assert
+    expect(phase).toMatchObject({ kind: 'active', quest: { type: 'focus' } });
+    expect(pickOffer('fitness', port.live())).toEqual({ kind: 'offer', type: 'fitness', error: null });
+  });
+
   test('a live meetup opens the meetup capture flow', () => {
     // Arrange
     const { port, engine } = engineSetup();

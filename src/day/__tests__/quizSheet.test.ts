@@ -1,6 +1,6 @@
 import type { Quest } from '../../contracts';
 import type { QuizRound } from '../quiz-bank';
-import { answerAt, quizOver, quizRetryPhase, quizView, submission } from '../quiz-sheet';
+import { answerAt, quizOver, quizRetryPhase, quizView, studyStep, submission } from '../quiz-sheet';
 
 const T0 = new Date(2026, 10, 16, 10, 0).getTime();
 const round: QuizRound = {
@@ -62,6 +62,18 @@ describe('answering', () => {
   test('submission pads unanswered questions with -1', () => {
     expect(submission([2])).toEqual([2, -1, -1]);
     expect(submission([0, 1, 2])).toEqual([0, 1, 2]);
+  });
+});
+
+describe('studyStep', () => {
+  test('an open round shows the quiz', () => {
+    expect(studyStep({ open: true, missed: true })).toBe('quiz');
+  });
+  test('a fresh quest starts its first round', () => {
+    expect(studyStep({ open: false, missed: false })).toBe('start');
+  });
+  test('after a miss with no open round, show not-yet (Try again starts the next one)', () => {
+    expect(studyStep({ open: false, missed: true })).toBe('notYet');
   });
 });
 

@@ -18,7 +18,7 @@ import { useNow } from '../hooks';
 import { activeView, afterAccept, afterVerify, notYetView, offerView, onVerifiedPhase, openPhase, passView, pickOffer, type Phase, type SheetPort } from '../quest-sheet';
 import { engineSheetPort, fakeSheetPort } from '../quest-sheet-port';
 import { payFor } from '../quest-copy';
-import { quizRetryPhase } from '../quiz-sheet';
+import { quizRetryPhase, studyStep } from '../quiz-sheet';
 import { MeetupFlow } from './MeetupFlow';
 
 const now = () => services.clock.now();
@@ -58,28 +58,33 @@ export default function QuestSheetHost() {
   const meetupQuestId = phase?.kind === 'meetup' ? phase.quest.id : null;
   const meetup = useMemo(() => (meetupQuestId ? port.meetup(meetupQuestId) : null), [port, meetupQuestId]);
   const close = () => setPhase(null);
+  /** "Try again" on a missed quiz: start the next round (its 90 s) only now, once the wait is over. */
+  const retryQuiz = (p: Extract<Phase, { kind: 'notYet' }>) => {
+    if (p.retryAt === null || now() >= p.retryAt) port.quizRound?.(p.quest.id);
+    setPhase(quizRetryPhase(p, now()));
+  };
 
   const body = (() => {
     if (!phase) return null;
     switch (phase.kind) {
       case 'offer':
-        return <QuestOffer view={offerView(port, phase)} onStart={() => setPhase(afterAccept(phase, port.accept(phase.type, phase.taskId)))} onPick={(type) => setPhase(pickOffer(type))} />;
+        return <QuestOffer view={offerView(port, phase)} onStart={() => setPhase(afterAccept(phase, port.accept(phase.type, phase.taskId)))} onPick={(type) => setPhase(pickOffer(type, port.live()))} />;
       case 'active': {
         const id = phase.quest.id;
         if (phase.quest.type === 'study' && port.quizRound && port.answerQuiz) {
-          const answer = port.answerQuiz;
-          const round = port.quizRound(id);
+          const { quizRound, answerQuiz } = port;
           const progress = port.progress(id);
-          if (!round && progress?.retryAt != null && clockNow < progress.retryAt) {
-            // Reopened while a missed quiz waits out its 5 minutes: show the wait, not an empty quiz.
-            const waiting = { kind: 'notYet' as const, quest: phase.quest, reason: 'A fresh three questions are on the way.', retryAt: progress.retryAt };
-            return <QuestNotYet view={notYetView(port, waiting, progress, clockNow)} onRetry={() => setPhase(quizRetryPhase(waiting, now()))} onClaimHalf={() => setPhase(afterVerify(waiting, port.claimHalf(id), true))} />;
+          const step = studyStep({ open: quizRound(id, { start: false }) !== null, missed: progress?.canClaimHalf ?? false });
+          if (step === 'notYet') {
+            // Reopened after a miss: the wait (or "Try again"), never a round that started unseen.
+            const missed = { kind: 'notYet' as const, quest: phase.quest, reason: 'The last quiz needed 2 of 3 right.', retryAt: progress?.retryAt ?? null };
+            return <QuestNotYet view={notYetView(port, missed, progress, clockNow)} onRetry={() => retryQuiz(missed)} onClaimHalf={() => setPhase(afterVerify(missed, port.claimHalf(id), true))} />;
           }
           return (
             <QuestQuiz
-              round={round}
+              round={quizRound(id)}
               pay={payFor('study', port.taskRate(phase.quest.taskId))}
-              onSubmit={(answers) => setPhase(afterVerify(phase, answer(id, answers)))}
+              onSubmit={(answers) => setPhase(afterVerify(phase, answerQuiz(id, answers)))}
               onStop={() => {
                 port.abandon(id);
                 close();
@@ -103,7 +108,7 @@ export default function QuestSheetHost() {
       case 'notYet': {
         const id = phase.quest.id;
         const view = notYetView(port, phase, port.progress(id), clockNow);
-        const retry = () => (phase.quest.type === 'study' ? setPhase(quizRetryPhase(phase, now())) : setPhase(afterVerify(phase, port.verify(id))));
+        const retry = () => (phase.quest.type === 'study' ? retryQuiz(phase) : setPhase(afterVerify(phase, port.verify(id))));
         return <QuestNotYet view={view} onRetry={retry} onClaimHalf={() => setPhase(afterVerify(phase, port.claimHalf(id), true))} />;
       }
       case 'meetup':

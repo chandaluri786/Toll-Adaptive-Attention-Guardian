@@ -224,6 +224,15 @@ describe('rounds: 3 of 9, 90 seconds, pass at 2', () => {
     expect(v.reason).toBe('Time ran out — 90 seconds for all three');
   });
 
+  test('peek returns the open round but never starts one (no clock running unseen)', async () => {
+    const { s, quest } = await ready();
+    expect(s.bank.round(quest, { peek: true })).toBeNull();
+    const open = s.bank.round(quest)!;
+    expect(s.bank.round(quest, { peek: true })).toEqual(open);
+    s.bank.grade(quest, [0, 0, 0]);
+    expect(s.bank.round(quest, { peek: true })).toBeNull();
+  });
+
   test('grading with no open round returns null', async () => {
     const { s, quest } = await ready();
     expect(s.bank.grade(quest, [0, 0, 0])).toBeNull();

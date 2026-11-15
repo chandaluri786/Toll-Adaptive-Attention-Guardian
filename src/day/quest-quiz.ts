@@ -20,8 +20,8 @@ type QuizActionDeps = {
 export type QuizActions = {
   /** A quiz is ready for this plan task (no id: for any of today's study tasks). */
   quizReady(taskId?: string): boolean;
-  /** The open round of a live study quest; null while waiting out a miss or with no questions. */
-  quizRound(questId: string): QuizRound | null;
+  /** The open round of a live study quest, starting the next one unless start: false. null while waiting out a miss or with no questions. */
+  quizRound(questId: string, opts?: { start?: boolean }): QuizRound | null;
   /** Grade the open round: 2 of 3 in 90 s passes. */
   answerQuiz(questId: string, answers: readonly number[]): VerifyResult;
 };
@@ -31,10 +31,10 @@ const waiting = (r: QuestRecord, now: number) => r.retryAt !== null && now < r.r
 export function createQuizActions(deps: QuizActionDeps): QuizActions {
   return {
     quizReady: (taskId) => deps.quiz?.ready(taskId) ?? false,
-    quizRound(questId) {
+    quizRound(questId, opts = {}) {
       const r = deps.live(questId);
       if (typeof r === 'string' || r.quest.type !== 'study' || !deps.quiz || waiting(r, deps.now())) return null;
-      return deps.quiz.round(r.quest);
+      return deps.quiz.round(r.quest, { peek: opts.start === false });
     },
     answerQuiz(questId, answers) {
       const r = deps.live(questId);

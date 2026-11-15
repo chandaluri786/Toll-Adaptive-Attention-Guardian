@@ -30,8 +30,8 @@ export type QuizBank = {
   sync(): Promise<void>;
   /** A quiz is ready for this plan task (or, with no id, for any of today's study tasks). */
   ready(taskId?: string): boolean;
-  /** The open round for a study quest, or a fresh 3 if the last one was graded. null = no questions. */
-  round(quest: Quest): QuizRound | null;
+  /** The open round for a study quest, or a fresh 3 if the last one was graded (peek: never start one). null = none. */
+  round(quest: Quest, opts?: { peek?: boolean }): QuizRound | null;
   /** Grade the open round and close it. null = no open round. */
   grade(quest: Quest, answers: readonly number[]): Verdict | null;
   subscribe(fn: () => void): Unsub;
@@ -155,9 +155,10 @@ export function createQuizBank(deps: QuizBankDeps): QuizBank {
     return { questId, topic: r.topic, questions, startedAt: r.startedAt, endsAt: r.startedAt + QUIZ_SECONDS * 1000 };
   };
 
-  function round(quest: Quest): QuizRound | null {
+  function round(quest: Quest, opts: { peek?: boolean } = {}): QuizRound | null {
     const prev = state.rounds[quest.id];
     if (prev?.open) return view(quest.id, prev);
+    if (opts.peek) return null;
     const topic = prev && state.pools[prev.key] ? prev.topic : topicFor(quest);
     if (!topic) return null;
     const seen = prev ? [...prev.seen, ...prev.drawn] : [];

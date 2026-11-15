@@ -101,6 +101,18 @@ describe('study quests with a quiz ready', () => {
     expect(second.questions.some((q) => seen.includes(q.q))).toBe(false);
   });
 
+  test('after a miss the next round starts only when asked, never on its own', async () => {
+    const s = await setup();
+    const quest = acceptStudy(s);
+    s.engine.quizRound(quest.id);
+    s.engine.answerQuiz(quest.id, [1, 1, 1]);
+    s.advance(6 * MIN);
+
+    expect(s.engine.quizRound(quest.id, { start: false })).toBeNull();
+    const fresh = s.engine.quizRound(quest.id)!;
+    expect(fresh.startedAt).toBe(s.engine.quizRound(quest.id, { start: false })!.startedAt);
+  });
+
   test('claim half after a miss pays half and marks the task half done', async () => {
     const s = await setup();
     const quest = acceptStudy(s);

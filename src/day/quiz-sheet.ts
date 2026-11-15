@@ -41,6 +41,15 @@ export const quizOver = (round: QuizRound, answers: readonly number[], now: numb
 /** What goes to the engine: one entry per question, -1 where time ran out first. */
 export const submission = (answers: readonly number[]): number[] => Array.from({ length: QUIZ_DRAW }, (_, i) => answers[i] ?? UNANSWERED);
 
+/**
+ * What an in-progress study quest shows: the open round; a fresh quest's first round; or, after a
+ * miss, the not-yet screen — the next round (and its 90 s) starts only when "Try again" is tapped.
+ */
+export function studyStep(s: { open: boolean; missed: boolean }): 'quiz' | 'start' | 'notYet' {
+  if (s.open) return 'quiz';
+  return s.missed ? 'notYet' : 'start';
+}
+
 /** "Try again" on a missed quiz: a fresh round once the 5 minutes are up. */
 export function quizRetryPhase(phase: Extract<Phase, { kind: 'notYet' }>, now: number): Phase {
   if (phase.retryAt !== null && now < phase.retryAt) return phase;

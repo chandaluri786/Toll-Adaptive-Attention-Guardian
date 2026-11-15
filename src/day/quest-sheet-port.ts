@@ -25,7 +25,7 @@ export function engineSheetPort(engine: QuestEngine, store: PlannerStore, now: (
     verify: (id) => engine.verify(id),
     claimHalf: (id) => engine.claimHalf(id),
     abandon: (id) => void engine.abandon(id),
-    quizRound: (id) => engine.quizRound(id),
+    quizRound: (id, opts) => engine.quizRound(id, opts),
     answerQuiz: (id, answers) => engine.answerQuiz(id, answers),
     meetup(id): MeetupContext | null {
       const p = engine.progress(id);

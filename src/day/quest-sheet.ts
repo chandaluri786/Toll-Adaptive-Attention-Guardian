@@ -28,7 +28,7 @@ export type SheetPort = {
   abandon(questId: string): void;
   meetup(questId: string): MeetupContext | null;
   /** B10: the open round of a study quest (null = no questions, or waiting out a miss). */
-  quizRound?(questId: string): QuizRound | null;
+  quizRound?(questId: string, opts?: { start?: boolean }): QuizRound | null;
   answerQuiz?(questId: string, answers: readonly number[]): VerifyResult;
   /** Fakes only: show the not-yet state on demand (the stub sensors never miss). */
   simulateMiss?(questId: string): VerifyResult;
@@ -60,8 +60,11 @@ export function openPhase(port: SheetPort, req: OpenRequest = {}): Phase {
   return { kind: 'offer', type: DEFAULT_TYPE, error: null };
 }
 
-/** Picking another quest from the "Other quests" chips drops the plan-task link. */
-export const pickOffer = (type: TaskType): Phase => ({ kind: 'offer', type, error: null });
+/** Picking another quest from the "Other quests" chips drops the plan-task link; one already running resumes. */
+export function pickOffer(type: TaskType, live: readonly Quest[] = []): Phase {
+  const running = live.find((q) => q.type === type);
+  return running ? activeOrMeetup(running) : { kind: 'offer', type, error: null };
+}
 
 export function afterAccept(phase: Extract<Phase, { kind: 'offer' }>, r: AcceptResult): Phase {
   return r.ok ? activeOrMeetup(r.quest) : { ...phase, error: r.error };
