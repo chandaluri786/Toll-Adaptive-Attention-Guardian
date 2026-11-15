@@ -76,4 +76,14 @@ After that, the whole team runs S7, S8, S9 and S1–S6 again.
 
 ## Stack
 
-Expo SDK 58 · React Native 0.88 · Expo Router · TypeScript 6 · Jest (jest-expo). Native modules: `expo-app-blocker` (pinned 0.1.78; Android usage stats and overlay), expo-sensors, expo-location, expo-camera, `@react-native-ml-kit/text-recognition`, react-native-mmkv.
+Expo SDK 58 · React Native 0.88 · Expo Router · TypeScript 6 · Jest (jest-expo) · react-native-web (browser preview).
+
+Native modules: `expo-app-blocker` (pinned 0.1.78; Android usage stats and overlay), expo-sensors, expo-location, expo-camera, expo-notifications, expo-font, `@react-native-ml-kit/text-recognition`, react-native-mmkv, react-native-svg.
+
+JS libraries: `lucide-react-native` (icons), `@expo-google-fonts/cormorant-garamond` and `@expo-google-fonts/roboto` (fonts), react-native-web.
+
+### Requirements
+
+- **Node 22.13 or newer.** Older Node fails with `URL.parse is not a function`.
+- **JDK 17 for Android builds.** Newer JDKs (for example the one bundled with Android Studio, JDK 25) break `expo-app-blocker`. On macOS: `export JAVA_HOME=$(/usr/libexec/java_home -v 17)`. On Linux, point `JAVA_HOME` at your JDK 17 install. Then `cd android && ./gradlew --stop` and `npx expo run:android`.
+- **After pulling new native dependencies** (the design commit added expo-notifications, expo-font and react-native-svg), rebuild the dev build: `npx expo run:android`. Web preview needs no rebuild.
