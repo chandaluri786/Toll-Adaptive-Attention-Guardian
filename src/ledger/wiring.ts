@@ -2,9 +2,14 @@
 // it obeys the *enforced* weather (during the 90-s advisory the old weather still rules), reads
 // emergency unlocks from C's governor for history() and its live window for activeWindows(), and starts its day tracker (usage samples,
 // Storm minutes, plan progress) on first use, once services are wired.
-import type { AccessWindow, GetServices, Governor, Ledger, Posture, PostureState, Unsub } from '../contracts';
+// C9: once started it syncs to the cloud ledger on every change and retries on clock ticks; demo
+// reset/seed start a new wallet. Cloud sync is off unless `cloud.baseUrl` is given (jest never sets it).
+import type { AccessWindow, GetServices, Governor, Ledger, Posture, PostureState, Seed, Unsub } from '../contracts';
+import { createLedgerCloud, type CloudDeps } from './cloud';
 import type { KV } from './kv';
 import { createRealLedger, type RealLedgerDeps } from './real';
+
+export type CloudOptions = Partial<Pick<CloudDeps, 'baseUrl' | 'fetch' | 'randomBytes'>>;
 
 /**
  * The weather the ledger obeys. Grace only ever comes with a tightening, so "Storm shown with grace"
@@ -38,7 +43,12 @@ export function onEmergencyVia(governor: Governor | undefined, fn: () => void): 
   return typeof g?.onUse === 'function' ? g.onUse(() => fn()) : () => {};
 }
 
-export function wireLedger(get: GetServices, kv: KV, overrides: Partial<RealLedgerDeps> = {}) {
+export function wireLedger(
+  get: GetServices,
+  kv: KV,
+  overrides: Partial<RealLedgerDeps> = {},
+  cloudOptions: CloudOptions = {},
+) {
   const real = createRealLedger({
     get,
     kv,
@@ -48,13 +58,24 @@ export function wireLedger(get: GetServices, kv: KV, overrides: Partial<RealLedg
     onEmergency: (fn) => onEmergencyVia(get().governor, fn),
     ...overrides,
   });
+  const cloud = createLedgerCloud({
+    kv,
+    baseUrl: cloudOptions.baseUrl ?? null,
+    fetch: cloudOptions.fetch,
+    randomBytes: cloudOptions.randomBytes,
+    now: () => get().clock.now(),
+    events: () => real.debug.events(),
+  });
   let started = false;
+  let unsubs: Unsub[] = [];
   /** The day tracker subscribes to the clock, usage feed and planner, so wait until they exist. */
   const use = (): Ledger => {
     const s = get();
     if (!started && s.clock && s.usageFeed && s.planner && s.postureSource && s.governor) {
       started = true;
       real.start();
+      unsubs = [real.services.ledger.onChange(() => cloud.kick()), s.clock.onTick(() => cloud.retry())];
+      cloud.kick();
     }
     return real.services.ledger;
   };
@@ -68,5 +89,22 @@ export function wireLedger(get: GetServices, kv: KV, overrides: Partial<RealLedg
     onChange: (fn) => use().onChange(fn),
   };
 
-  return { services: { ledger }, debug: real.debug, stop: () => real.stop() };
+  const debug = {
+    ...real.debug,
+    reset: () => {
+      cloud.forget();
+      real.debug.reset();
+    },
+    seed: (seed: Seed) => {
+      cloud.forget();
+      real.debug.seed(seed);
+    },
+  };
+  const stop = () => {
+    unsubs.forEach((u) => u());
+    unsubs = [];
+    real.stop();
+  };
+
+  return { services: { ledger }, debug, cloud, stop };
 }
