@@ -153,3 +153,44 @@ describe('Planner (B1)', () => {
     expect(store.getState().goals).toHaveLength(1);
   });
 });
+
+describe('GitHub for coding quests (B11)', () => {
+  test('starts unset; a username or owner/repo is saved in its plain form', () => {
+    // Arrange
+    const { store } = setup();
+    // Act
+    const before = store.getState().github;
+    const saved = store.setGithub(' https://github.com/octocat/Hello-World ');
+    // Assert
+    expect(before).toBeNull();
+    expect(saved).toEqual({ ok: true });
+    expect(store.getState().github).toBe('octocat/Hello-World');
+  });
+
+  test('a bad name is refused with a calm hint and nothing changes', () => {
+    // Arrange
+    const { store } = setup();
+    store.setGithub('octocat');
+    // Act
+    const r = store.setGithub('not a name');
+    // Assert
+    expect(r).toEqual({ ok: false, error: 'Use a GitHub username, or owner/repo' });
+    expect(store.getState().github).toBe('octocat');
+  });
+
+  test('clearing removes it; it persists across a restart; junk in storage is dropped', () => {
+    // Arrange
+    const { store, kv } = setup();
+    store.setGithub('octocat');
+    // Act
+    const reloaded = createPlannerStore({ kv, now: () => at(9) }).getState().github;
+    store.clearGithub();
+    const cleared = createPlannerStore({ kv, now: () => at(9) }).getState().github;
+    kv.set('planner', JSON.stringify({ ...store.getState(), github: 'bad name/../x' }));
+    const junk = createPlannerStore({ kv, now: () => at(9) }).getState().github;
+    // Assert
+    expect(reloaded).toBe('octocat');
+    expect(cleared).toBeNull();
+    expect(junk).toBeNull();
+  });
+});

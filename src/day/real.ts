@@ -5,6 +5,7 @@
 // until a service method is used, and the engine starts on the first call once the clock exists.
 import type { DeviceSignals, GetServices, Planner, Quest, Quests, QuestsDebug, Seed, TaskType } from '../contracts';
 import { planSheetRequests, sheetRequests } from './fakes';
+import { countCommits, type GithubClientDeps } from './github-client';
 import type { KV } from './kv';
 import { createPlanActions, type PlanActions } from './plan';
 import { createPlanner, defaultState, todaysPlan, type PlannerStore } from './planner';
@@ -21,6 +22,8 @@ export type RealDayDeps = {
   steps: () => StepSource;
   /** B10: the quiz Lambda. Missing = no quizzes; study tasks verify by focus. */
   quiz?: Pick<QuizRequestDeps, 'baseUrl' | 'fetch'>;
+  /** B11: GitHub's public API (no auth). Missing = no coding quests. */
+  github?: GithubClientDeps;
 };
 
 type Core = { store: PlannerStore; planActions: PlanActions; planner: Planner; engine: QuestEngine; quiz: QuizBank };
@@ -61,6 +64,7 @@ export function createRealDay(get: GetServices, deps: RealDayDeps) {
       onTick: (fn) => get().clock.onTick(fn),
       sheetRequests,
       quiz,
+      ...(deps.github ? { github: (target: string) => countCommits(target, deps.github!) } : {}),
     });
     return { store, planActions, planner, engine, quiz };
   };

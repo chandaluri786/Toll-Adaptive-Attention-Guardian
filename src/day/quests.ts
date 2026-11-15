@@ -9,14 +9,16 @@ import { readJson, type KV } from './kv';
 import type { PlanActions } from './plan';
 import { todaysPlan, type PlannerStore } from './planner';
 import { evaluate, evaluateMeetupPhoto, liveReadout, passRate, type EvalContext, type LiveReadout } from './quest-evaluate';
+import { createEngineDebug } from './quest-debug';
+import { createCommitWatch, newCommitWatch, type CommitCounter, type CommitReadout } from './quest-github';
 import { createQuizActions, type QuizActions, type QuizPort } from './quest-quiz';
-import { blockedReason, CLAIM_HALF_RATE, METHOD_FOR, QUEST_TARGETS, QUEST_TTL_MS, questTypeFor, questTypesForTask, RETRY_AFTER_MS, suggestQuest, type Offer, type RuleContext } from './quest-rules';
+import { blockedReason, CLAIM_HALF_RATE, QUEST_TARGETS, QUEST_TTL_MS, questTypeFor, questTypesForTask, RETRY_AFTER_MS, suggestQuest, type Offer, type RuleContext } from './quest-rules';
 import { emptyState, loadEngineState, MAX_SAMPLES, MAX_SCREEN_EVENTS, pruneRecords, STORAGE_KEY, type EngineState, type QuestRecord, type ScreenEvent } from './quest-state';
 import { dayKey } from './time';
 import { countMeetupWords } from './verifiers';
 import { generateMeetupCode, type MeetupCode } from './wordlist';
 
-export type { LiveReadout, Offer };
+export type { CommitCounter, CommitReadout, LiveReadout, Offer };
 
 /** Steps since this subscription started (expo-sensors `Pedometer.watchStepCount` semantics). */
 export type StepSource = { subscribe(fn: (stepsSinceStart: number) => void): Unsub };
@@ -35,6 +37,8 @@ export type QuestEngineDeps = {
   sheetRequests?: Emitter<SheetRequest>;
   /** B10: study quests take a quiz when its questions are in; without it they verify by focus. */
   quiz?: QuizPort;
+  /** B11: reads a GitHub commit count; without it coding quests aren't offered. */
+  github?: CommitCounter;
 };
 
 export type AcceptResult = { ok: true; quest: Quest } | { ok: false; error: string };
@@ -71,8 +75,6 @@ export type QuestEngine = Quests & QuizActions & {
   debug: QuestsDebug;
 };
 
-/** Debug `addSteps` stands for a real walk at this pace, so a demo walk isn't "too quick". */
-const DEBUG_STEPS_PER_MIN = 100;
 const MAX_OCR_CHARS = 2_000;
 const unavailable = (error: string): VerifyResult => ({ kind: 'unavailable', error });
 
@@ -108,6 +110,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     lastPassed: state.lastPassed,
     hasHome: deps.planner.getState().home !== null,
     quizReady: (taskId) => deps.quiz?.ready(taskId) ?? false,
+    github: !deps.github ? 'unwired' : deps.planner.getState().github ? 'ready' : 'unset',
   });
   const taskRate = (q: Quest) => todaysPlan(deps.planner.getState(), deps.now())?.tasks.find((t) => t.id === q.taskId)?.rate ?? 1;
 
@@ -243,12 +246,14 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
       target: QUEST_TARGETS[type],
       acceptedAt: t,
       expiresAt: t + QUEST_TTL_MS,
-      baseline: { steps: state.stepCounter },
+      baseline: type === 'coding' ? {} : { steps: state.stepCounter }, // coding: commits arrive with the first read
       status: 'active',
     };
-    const record: QuestRecord = { quest, code: type === 'meetup' ? makeCode() : null, screen: [], locations: [], bonusWalkMin: 0, lastVerdict: null, retryAt: null, missed: false, endedAt: null };
+    const github = type === 'coding' ? newCommitWatch(deps.planner.getState().github ?? '', t) : null;
+    const record: QuestRecord = { quest, code: type === 'meetup' ? makeCode() : null, screen: [], locations: [], bonusWalkMin: 0, lastVerdict: null, retryAt: null, missed: false, endedAt: null, github };
     save({ ...state, seq: state.seq + 1, records: [...state.records, record] });
     syncSensors();
+    if (github) void commits.poll(quest.id);
     return { ok: true, quest };
   }
 
@@ -268,6 +273,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     const v = evaluate(r, evalCtx());
     if (r.quest.type === 'meetup') return { kind: 'missed', verdict: v, retryAt: null }; // passes only via a photo
     if (r.quest.type === 'study') return unavailable('Answer the quiz to verify'); // passes only via answerQuiz
+    if (r.quest.type === 'coding') return commits.verify(r); // never a miss on a network problem
     if (v.pass) return finishPass(r, v, passRate(taskRate(r.quest), v));
     return recordMiss(r, v, true);
   }
@@ -327,37 +333,34 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
   function tick() {
     expireDue();
     liveRecords().filter((r) => r.quest.type === 'focus').forEach(autoCheck);
+    commits.pollDue();
   }
+
+  const commits = createCommitWatch({
+    counter: deps.github,
+    now: deps.now,
+    find,
+    isLive,
+    liveRecords,
+    update: (id, fn) => save(replace(state, id, fn)),
+    pass: (r, v) => finishPass(r, v, passRate(taskRate(r.quest), v)),
+    miss: (r, v) => recordMiss(r, v, true),
+  });
 
   const quizActions = createQuizActions({ quiz: deps.quiz, now: deps.now, live: liveOrError, pass: (r, v) => finishPass(r, v, passRate(taskRate(r.quest), v)), miss: (r, v) => recordMiss(r, v, true) });
 
-  // ---- debug (demo panel) ----
-
-  const debug: QuestsDebug = {
+  const debug = createEngineDebug({
     reset() {
       save(emptyState());
       syncSensors();
     },
-    seed() {
-      debug.reset();
-    },
-    addSteps(n) {
-      if (!Number.isFinite(n) || n <= 0) return;
-      addStepCount(Math.round(n), n / DEBUG_STEPS_PER_MIN);
-    },
-    passActive() {
-      expireDue();
-      let r = liveRecords()[0];
-      if (!r) {
-        const made = accept('fitness');
-        const fallback = made.ok ? made : accept('focus');
-        if (!fallback.ok) return;
-        r = find(fallback.quest.id)!;
-      }
-      const v: Verdict = { questId: r.quest.id, pass: true, method: METHOD_FOR[r.quest.type], reason: 'Done (demo)', measured: `${r.quest.target} of ${r.quest.target}`, flags: [] };
-      finishPass(r, v, taskRate(r.quest));
-    },
-  };
+    addStepCount,
+    expireDue,
+    liveRecords,
+    accept,
+    find,
+    pass: (r, v) => void finishPass(r, v, taskRate(r.quest)),
+  });
 
   return {
     openSheet: (ctx) => sheets.emit({ ...ctx }),
@@ -371,6 +374,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
       if (deps.onTick) subs.tick = deps.onTick(() => tick());
       expireDue();
       syncSensors();
+      commits.pollDue();
     },
     stop() {
       subs.steps?.();

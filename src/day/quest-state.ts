@@ -1,6 +1,7 @@
 // OWNER: B (Spec B — task B3). The quest engine's persisted state (under `day:quests`) and its
 // validation. Stored data is never trusted: anything malformed is dropped on load.
 import type { LocationSample, Quest, TaskType, Verdict } from '../contracts';
+import type { CommitIssue } from './github-client';
 import { TASK_TYPES } from './plan';
 import type { MeetupCode } from './wordlist';
 
@@ -15,6 +16,13 @@ const ENDED_KEEP_MS = 24 * 60 * 60_000;
 
 export type ScreenEvent = { at: number; on: boolean };
 
+/**
+ * B11: a coding quest's watch on GitHub. The baseline itself lives in `quest.baseline.commits`
+ * (set by the first good read); `target` is fixed at accept so a Settings change mid-quest can't
+ * compare two different counts. `checkedAt` = last attempt, good or not.
+ */
+export type CommitWatch = { target: string; latest: number | null; checkedAt: number | null; nextPollAt: number; issue: CommitIssue | null };
+
 export type QuestRecord = {
   quest: Quest;
   code: MeetupCode | null; // meetup only
@@ -26,6 +34,7 @@ export type QuestRecord = {
   retryAt: number | null;
   missed: boolean; // a miss happened: "Claim half" is on offer
   endedAt: number | null;
+  github: CommitWatch | null; // coding only
 };
 
 export type EngineState = {
@@ -66,6 +75,14 @@ const isSample = (s: unknown): s is LocationSample =>
   isObj(s) && isNum(s.at) && isNum(s.lat) && isNum(s.lon) && isNum(s.accuracyM) && typeof s.mocked === 'boolean';
 const isScreen = (e: unknown): e is ScreenEvent => isObj(e) && isNum(e.at) && typeof e.on === 'boolean';
 const isCode = (c: unknown): c is MeetupCode => Array.isArray(c) && c.length === 3 && c.every((w) => typeof w === 'string');
+const ISSUES: CommitIssue[] = ['offline', 'rate_limited', 'not_found', 'error'];
+const isWatch = (w: unknown): w is CommitWatch =>
+  isObj(w) &&
+  typeof w.target === 'string' &&
+  (w.latest === null || isNum(w.latest)) &&
+  (w.checkedAt === null || isNum(w.checkedAt)) &&
+  isNum(w.nextPollAt) &&
+  (w.issue === null || ISSUES.includes(w.issue as CommitIssue));
 const isVerdict = (v: unknown): v is Verdict =>
   isObj(v) && typeof v.questId === 'string' && typeof v.pass === 'boolean' && typeof v.reason === 'string' && typeof v.measured === 'string' && Array.isArray(v.flags);
 
@@ -81,6 +98,7 @@ function loadRecord(raw: unknown): QuestRecord | null {
     retryAt: isNum(raw.retryAt) ? raw.retryAt : null,
     missed: raw.missed === true,
     endedAt: isNum(raw.endedAt) ? raw.endedAt : null,
+    github: isWatch(raw.github) ? { ...raw.github } : null,
   };
 }
 

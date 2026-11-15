@@ -3,6 +3,7 @@
 // Pure: storage and time are injected, so everything here is unit-tested without a phone.
 import type { Block, Planner, TaskType, Unsub } from '../contracts';
 import { createEmitter } from '../shared/emitter';
+import { formatGithubTarget, GITHUB_HINT, parseGithubTarget } from './github';
 import { readJson, type KV } from './kv';
 import { dayKey, isHHMM, localAt, minutesOfDay, parseHHMM, windowMinutes } from './time';
 
@@ -50,6 +51,8 @@ export type PlannerState = {
   plan: DayPlan | null;
   declinedDay: string | null; // planning day the user chose "Not today"
   reminders: RemindersSent | null;
+  /** B11: the GitHub username or owner/repo coding quests watch; only this name goes to GitHub. */
+  github: string | null;
 };
 
 /** Standing goals from the doc, one per task type. Users revise them rarely. */
@@ -70,7 +73,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
 };
 
 export function defaultState(): PlannerState {
-  return { version: SCHEMA_VERSION, goals: DEFAULT_GOALS, blocks: [], sleep: { ...DEFAULT_SLEEP }, home: null, plan: null, declinedDay: null, reminders: null };
+  return { version: SCHEMA_VERSION, goals: DEFAULT_GOALS, blocks: [], sleep: { ...DEFAULT_SLEEP }, home: null, plan: null, declinedDay: null, reminders: null, github: null };
 }
 
 // ---- validation: returns a friendly message, or null when fine ----
@@ -106,7 +109,9 @@ function loadState(raw: unknown): PlannerState {
   const declinedDay = typeof r.declinedDay === 'string' ? r.declinedDay : null;
   const reminders =
     r.reminders && typeof r.reminders.day === 'string' && Array.isArray(r.reminders.kinds) ? r.reminders : null;
-  return { version: SCHEMA_VERSION, goals, blocks, sleep, home, plan, declinedDay, reminders };
+  const target = typeof r.github === 'string' ? parseGithubTarget(r.github) : null;
+  const github = target ? formatGithubTarget(target) : null;
+  return { version: SCHEMA_VERSION, goals, blocks, sleep, home, plan, declinedDay, reminders, github };
 }
 
 // ---- store ----
@@ -124,6 +129,9 @@ export type PlannerStore = {
   addBlock(block: NewBlock): AddResult;
   removeBlock(id: string): void;
   setGoals(goals: Goal[]): void;
+  /** B11: a username or owner/repo (pasted links are tidied); refused with a calm hint otherwise. */
+  setGithub(raw: string): AddResult;
+  clearGithub(): void;
 };
 
 export function createPlannerStore(deps: { kv: KV; now: () => number }): PlannerStore {
@@ -158,6 +166,13 @@ export function createPlannerStore(deps: { kv: KV; now: () => number }): Planner
     },
     removeBlock: (id) => update((s) => ({ ...s, blocks: s.blocks.filter((b) => b.id !== id) })),
     setGoals: (goals) => update((s) => ({ ...s, goals: goals.map((g) => ({ ...g })) })),
+    setGithub(raw) {
+      const target = parseGithubTarget(raw);
+      if (!target) return { ok: false, error: GITHUB_HINT };
+      update((s) => ({ ...s, github: formatGithubTarget(target) }));
+      return { ok: true };
+    },
+    clearGithub: () => update((s) => ({ ...s, github: null })),
   };
 }
 

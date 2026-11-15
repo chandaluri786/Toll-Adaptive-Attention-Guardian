@@ -373,12 +373,12 @@ describe('fakes (USE_REAL=false)', () => {
     expect(ledger.services.ledger.balance()).toBe(30);
   });
 
-  test('quiz and commit chips are not startable yet', () => {
+  test('fakes: the commit quest asks for GitHub in Settings', () => {
     // Arrange
     const { port } = fakeSetup();
     // Act
     const r = port.accept('coding');
     // Assert
-    expect(r).toEqual({ ok: false, error: "Coding quests aren't ready yet" });
+    expect(r).toEqual({ ok: false, error: 'Add your GitHub username in Settings → Planner' });
   });
 });

@@ -3,6 +3,7 @@
 import type { LocationSample, Verdict } from '../contracts';
 import { MIN } from '../shared/emitter';
 import { FLAGGED_RATE, FLAT_STEPS } from './quest-rules';
+import { commitReadout, type CommitReadout } from './quest-github';
 import type { QuestRecord } from './quest-state';
 import { distanceM, locationMissReason, longestAwayMinutes, longestScreenOffMs, verifyAwayFromHome, verifyMeetup, verifyScreenOff, verifySteps } from './verifiers';
 
@@ -74,7 +75,7 @@ export function passRate(taskRate: number, v: Verdict): number {
 }
 
 /** Raw numbers for the quest sheet's live readout (3.2–3.4). */
-export type LiveReadout = { steps: number; awayMin: number; distanceM: number | null; offMs: number };
+export type LiveReadout = { steps: number; awayMin: number; distanceM: number | null; offMs: number; commits?: CommitReadout | null };
 
 export function liveReadout(r: QuestRecord, ctx: EvalContext, running: boolean): LiveReadout {
   const latest = r.locations.reduce<LocationSample | null>((a, s) => (!a || s.at > a.at ? s : a), null);
@@ -83,5 +84,6 @@ export function liveReadout(r: QuestRecord, ctx: EvalContext, running: boolean):
     awayMin: ctx.home ? longestAwayMinutes(r.locations, ctx.home) : 0,
     distanceM: ctx.home && latest ? Math.round(distanceM(ctx.home, latest)) : null,
     offMs: longestScreenOffMs(r.screen, running ? ctx.now : undefined),
+    commits: commitReadout(r),
   };
 }

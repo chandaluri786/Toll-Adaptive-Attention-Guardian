@@ -51,13 +51,11 @@ const GOAL_TITLES: Record<TaskType, string> = {
 };
 
 /**
- * The quest type that verifies a task. Study falls back to focus until the quiz (B10) lands;
- * coding has no verifier until B11, so it gets no quest yet.
+ * The quest type that verifies a task. Study falls back to focus (the quiz is offered on top of it
+ * by questTypesForTask once its questions are in); coding is checked on GitHub (B11).
  */
 export function questTypeFor(task: TaskType): TaskType | null {
-  if (task === 'study') return 'focus';
-  if (task === 'coding') return null;
-  return task;
+  return task === 'study' ? 'focus' : task;
 }
 
 export type Offer = { type: TaskType; taskId?: string; title: string; target: number; estMin: number };
@@ -70,7 +68,11 @@ export type RuleContext = {
   hasHome: boolean;
   /** B10: a quiz is ready for this plan task (no id: for any of today's study tasks). */
   quizReady?: (taskId?: string) => boolean;
+  /** B11: 'ready' = a GitHub name is set and the app can reach GitHub; 'unwired' = no client. */
+  github?: 'ready' | 'unset' | 'unwired';
 };
+
+export const GITHUB_UNSET = 'Add your GitHub username in Settings → Planner';
 
 export const QUIZ_NOT_READY = "Quiz questions aren't ready — try phone-down focus";
 
@@ -91,6 +93,7 @@ export function blockedReason(type: TaskType, ctx: RuleContext): string | null {
     return `Next ${TASK_LABELS[type].toLowerCase()} quest from ${formatHHMM(minutesOfDay(last + COOLDOWN_MS))}`;
   }
   if (NEEDS_HOME.includes(type) && !ctx.hasHome) return 'Set your home first — Settings → Planner';
+  if (type === 'coding' && ctx.github !== 'ready') return ctx.github === 'unwired' ? `${TASK_LABELS.coding} quests aren't ready yet` : GITHUB_UNSET;
   return null;
 }
 

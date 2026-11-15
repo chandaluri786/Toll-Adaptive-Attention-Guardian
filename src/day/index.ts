@@ -4,6 +4,7 @@ import type { GetServices } from '../contracts';
 import { createFakeDay } from './fakes';
 import { createMemoryKV } from './kv';
 import { createPlannerStore, type PlannerStore } from './planner';
+import type { GithubFetch } from './github-client';
 import type { QuizFetch } from './quiz-client';
 import { QUIZ_API_URL } from './quizConfig';
 import type { QuestEngine } from './quests';
@@ -28,6 +29,7 @@ const nativeDeps: RealDayDeps = {
   store: () => (require('./store') as typeof import('./store')).getPlannerStore(),
   kv: () => (require('./store') as typeof import('./store')).getDayKV(),
   steps: () => (require('./pedometer') as typeof import('./pedometer')).createPermittedStepSource(),
+  github: { fetch: ((url, init) => fetch(url, init as RequestInit)) as GithubFetch },
   ...(QUIZ_API_URL ? { quiz: { baseUrl: QUIZ_API_URL, fetch: ((url, init) => fetch(url, init as RequestInit)) as QuizFetch } } : {}),
 };
 

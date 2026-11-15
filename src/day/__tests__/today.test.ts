@@ -118,7 +118,7 @@ describe("today's tasks", () => {
     expect(todayView(input({ progress: { done: 2, total: 5 } })).tasks).toEqual({ kind: 'plan', count: '2 of 5 done', rows: [] });
   });
 
-  test('rows show done, half, live progress, Verify, and coding as later', () => {
+  test('rows show done, half, live progress and Verify (coding too, since B11)', () => {
     // Arrange
     const tasks = [
       task('a', { done: 1 }),
@@ -138,7 +138,7 @@ describe("today's tasks", () => {
       { kind: 'done', label: 'Half done' },
       { kind: 'live', label: '1,395 of 2,000 steps' },
       { kind: 'verify', questType: 'focus' },
-      { kind: 'later', label: 'Checks arrive soon' },
+      { kind: 'verify', questType: 'coding' },
     ]);
     expect(v.tasks.rows[3].meta).toBe('Focus · pays 8 min');
   });
