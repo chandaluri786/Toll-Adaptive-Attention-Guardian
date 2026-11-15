@@ -3,15 +3,15 @@
 import type { GetServices } from '../contracts';
 import { createFakeDay } from './fakes';
 import { createMemoryKV } from './kv';
-import { createPlannerStore } from './planner';
+import { createPlannerStore, type PlannerStore } from './planner';
 import type { QuestEngine } from './quests';
 import { createRealDay as createRealDayWith, type RealDayDeps } from './real';
 
 /** Flip to true at integration step 3, once B1–B3 are done. */
 export const USE_REAL = false;
 
-/** The fake has no engine; B's sheets fall back to placeholders when `engine` is missing. */
-export type DayModule = ReturnType<typeof createFakeDay> & { engine?: () => QuestEngine };
+/** The fake has no engine or store; B's screens fall back to the fakes when they are missing. */
+export type DayModule = ReturnType<typeof createFakeDay> & { engine?: () => QuestEngine; plannerStore?: () => PlannerStore };
 
 export function createDay(get: GetServices): DayModule {
   if (USE_REAL) return createRealDay(get);

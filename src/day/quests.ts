@@ -8,14 +8,14 @@ import { sheetRequests as defaultSheetRequests, type SheetRequest } from './fake
 import { readJson, type KV } from './kv';
 import type { PlanActions } from './plan';
 import { todaysPlan, type PlannerStore } from './planner';
-import { evaluate, evaluateMeetupPhoto, passRate, type EvalContext } from './quest-evaluate';
+import { evaluate, evaluateMeetupPhoto, liveReadout, passRate, type EvalContext, type LiveReadout } from './quest-evaluate';
 import { blockedReason, CLAIM_HALF_RATE, METHOD_FOR, QUEST_TARGETS, QUEST_TTL_MS, questTypeFor, RETRY_AFTER_MS, suggestQuest, type Offer, type RuleContext } from './quest-rules';
 import { emptyState, loadEngineState, MAX_SAMPLES, MAX_SCREEN_EVENTS, pruneRecords, STORAGE_KEY, type EngineState, type QuestRecord, type ScreenEvent } from './quest-state';
 import { dayKey } from './time';
 import { countMeetupWords } from './verifiers';
 import { generateMeetupCode, type MeetupCode } from './wordlist';
 
-export type { Offer };
+export type { LiveReadout, Offer };
 
 /** Steps since this subscription started (expo-sensors `Pedometer.watchStepCount` semantics). */
 export type StepSource = { subscribe(fn: (stepsSinceStart: number) => void): Unsub };
@@ -40,18 +40,29 @@ export type VerifyResult =
   | { kind: 'missed'; verdict: Verdict; retryAt: number | null }
   | { kind: 'wait'; verdict: Verdict; retryAt: number }
   | { kind: 'unavailable'; error: string };
-export type QuestProgress = { quest: Quest; verdict: Verdict | null; retryAt: number | null; code: MeetupCode | null; canClaimHalf: boolean };
+export type QuestProgress = {
+  quest: Quest;
+  verdict: Verdict | null;
+  retryAt: number | null;
+  code: MeetupCode | null;
+  canClaimHalf: boolean;
+  live: LiveReadout;
+};
 
 export type QuestEngine = Quests & {
   start(): void;
   stop(): void;
   subscribe(fn: () => void): Unsub;
   suggest(now?: number): Offer | null;
+  /** Why a quest of this type can't start right now (friendly copy), or null if it can. */
+  blocked(type: TaskType): string | null;
   accept(type: TaskType, taskId?: string): AcceptResult;
   progress(questId: string): QuestProgress | null;
   verify(questId: string): VerifyResult;
   submitMeetupPhoto(questId: string, ocrText: string): VerifyResult;
   claimHalf(questId: string): VerifyResult;
+  /** "Stop quest": ends a live quest quietly (no credit, no cooldown). */
+  abandon(questId: string): boolean;
   stepsToday(): number;
   tick(): void;
   debug: QuestsDebug;
@@ -289,7 +300,23 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     if (!r) return null;
     const live = isLive(r);
     const quest: Quest = r.quest.status === 'active' && !live ? { ...r.quest, status: 'expired' } : r.quest;
-    return { quest, verdict: live ? evaluate(r, evalCtx()) : r.lastVerdict, retryAt: r.retryAt, code: r.code, canClaimHalf: live && r.missed };
+    const ctx = evalCtx();
+    return {
+      quest,
+      verdict: live ? evaluate(r, ctx) : r.lastVerdict,
+      retryAt: r.retryAt,
+      code: r.code,
+      canClaimHalf: live && r.missed,
+      live: liveReadout(r, ctx, live),
+    };
+  }
+
+  function abandon(questId: string): boolean {
+    const r = find(questId);
+    if (!r || !isLive(r)) return false;
+    save(replace(state, questId, (x) => ({ ...x, quest: { ...x.quest, status: 'expired' }, endedAt: deps.now() })));
+    syncSensors();
+    return true;
   }
 
   function tick() {
@@ -355,11 +382,13 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     },
     subscribe: (fn) => changes.on(fn),
     suggest: (now = deps.now()) => suggestQuest(deps.planner.getState(), ruleCtx(now)),
+    blocked: (type) => blockedReason(type, ruleCtx()),
     accept,
     progress,
     verify,
     submitMeetupPhoto,
     claimHalf,
+    abandon,
     stepsToday,
     tick,
     debug,

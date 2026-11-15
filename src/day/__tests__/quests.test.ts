@@ -586,3 +586,61 @@ describe('debug helpers', () => {
     expect(stopLocation).toHaveBeenCalled();
   });
 });
+
+describe('live readout and stop (B8)', () => {
+  test('progress reports steps since accept for the steps ring', () => {
+    // Arrange
+    const { engine, steps } = setup();
+    steps.walk(100);
+    const q = accepted(engine.accept('fitness'));
+    // Act
+    steps.walk(1395);
+    // Assert
+    expect(engine.progress(q.id)?.live.steps).toBe(1395);
+  });
+
+  test('progress reports minutes away and the latest distance from home', () => {
+    // Arrange
+    const { engine, device } = setup();
+    const q = accepted(engine.accept('place'));
+    // Act
+    device.debug.walkAway(820, 33);
+    // Assert
+    const live = engine.progress(q.id)!.live;
+    expect(live.awayMin).toBe(33);
+    expect(live.distanceM).toBeGreaterThan(780);
+    expect(live.distanceM).toBeLessThan(860);
+  });
+
+  test('progress reports the screen-off stretch still running', () => {
+    // Arrange
+    const { engine, emitScreen, advance, now } = setup();
+    const q = accepted(engine.accept('focus'));
+    emitScreen({ at: now(), on: false });
+    // Act
+    advance(18 * MIN + 26_000);
+    // Assert
+    expect(engine.progress(q.id)?.live.offMs).toBe(18 * MIN + 26_000);
+  });
+
+  test('abandon ends a live quest without credit and frees the type', () => {
+    // Arrange
+    const { engine, verified, stopLocation } = setup();
+    const q = accepted(engine.accept('place'));
+    // Act
+    const stopped = engine.abandon(q.id);
+    // Assert
+    expect(stopped).toBe(true);
+    expect(engine.active()).toEqual([]);
+    expect(verified).toEqual([]);
+    expect(stopLocation).toHaveBeenCalledTimes(1);
+    expect(engine.accept('place').ok).toBe(true);
+  });
+
+  test('abandon refuses an unknown or ended quest', () => {
+    // Arrange
+    const { engine } = setup();
+    // Act / Assert
+    expect(engine.abandon('nope')).toBe(false);
+  });
+});

@@ -38,7 +38,7 @@ describe('createRealDay', () => {
     const fake = createFakeDay(() => ({}) as Services);
 
     // Assert
-    expect(sorted(day)).toEqual([...sorted(fake), 'engine'].sort());
+    expect(sorted(day)).toEqual([...sorted(fake), 'engine', 'plannerStore'].sort());
     expect(sorted(day.services)).toEqual(sorted(fake.services));
     expect(sorted(day.services.planner)).toEqual(sorted(fake.services.planner));
     expect(sorted(day.services.quests)).toEqual(sorted(fake.services.quests));

@@ -4,7 +4,7 @@ import type { LocationSample, Verdict } from '../contracts';
 import { MIN } from '../shared/emitter';
 import { FLAGGED_RATE, FLAT_STEPS } from './quest-rules';
 import type { QuestRecord } from './quest-state';
-import { locationMissReason, verifyAwayFromHome, verifyMeetup, verifyScreenOff, verifySteps } from './verifiers';
+import { distanceM, locationMissReason, longestAwayMinutes, longestScreenOffMs, verifyAwayFromHome, verifyMeetup, verifyScreenOff, verifySteps } from './verifiers';
 
 export type Home = { lat: number; lon: number };
 export type EvalContext = { now: number; stepCounter: number; home: Home | null; stepSourceLive: boolean };
@@ -71,4 +71,17 @@ export function evaluateMeetupPhoto(r: QuestRecord, ocrText: string, home: Home 
 /** Rate for a pass: the plan task's rate (0.5 if added after the lock), lowered if flagged. */
 export function passRate(taskRate: number, v: Verdict): number {
   return v.flags.length > 0 ? taskRate * FLAGGED_RATE : taskRate;
+}
+
+/** Raw numbers for the quest sheet's live readout (3.2–3.4). */
+export type LiveReadout = { steps: number; awayMin: number; distanceM: number | null; offMs: number };
+
+export function liveReadout(r: QuestRecord, ctx: EvalContext, running: boolean): LiveReadout {
+  const latest = r.locations.reduce<LocationSample | null>((a, s) => (!a || s.at > a.at ? s : a), null);
+  return {
+    steps: stepsSince(r, ctx.stepCounter),
+    awayMin: ctx.home ? longestAwayMinutes(r.locations, ctx.home) : 0,
+    distanceM: ctx.home && latest ? Math.round(distanceM(ctx.home, latest)) : null,
+    offMs: longestScreenOffMs(r.screen, running ? ctx.now : undefined),
+  };
 }

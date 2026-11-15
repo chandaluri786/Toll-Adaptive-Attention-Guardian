@@ -15,7 +15,8 @@ import type {
 } from '../contracts';
 import { createEmitter, HOUR } from '../shared/emitter';
 
-export type SheetRequest = { from: 'storm_screen' | 'today'; posture: Posture; pkg?: string };
+/** `offer` (B8/B9): Today asks for a specific quest — a plan task's Verify or the suggested quest. */
+export type SheetRequest = { from: 'storm_screen' | 'today'; posture: Posture; pkg?: string; offer?: { type: TaskType; taskId?: string } };
 
 /** QuestSheetHost (B) and PlanMyDaySheet (B) listen to these. */
 export const sheetRequests = createEmitter<SheetRequest>();
