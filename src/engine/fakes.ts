@@ -14,7 +14,9 @@ export function createFakeClock() {
   const clock: Clock & {
     setNow(t: number): void;
     setSpeed(x: number): void;
+    speed(): number;
     tick(): void;
+    resetNow(): void;
   } = {
     now,
     onTick(fn) {
@@ -31,8 +33,16 @@ export function createFakeClock() {
       anchorReal = Date.now();
       speed = x;
     },
+    speed: () => speed,
     /** Fire one tick by hand (tests, demo panel). Real clock ticks every 60 s. */
     tick() {
+      ticks.emit(now());
+    },
+    /** Back to real time at normal speed (demo panel "Reset everything"). */
+    resetNow() {
+      anchorReal = Date.now();
+      anchorFake = anchorReal;
+      speed = 1;
       ticks.emit(now());
     },
   };

@@ -27,6 +27,8 @@ export type RealClock = Clock & {
   speed(): number;
   /** Fire one tick by hand (tests, demo panel). */
   tick(): void;
+  /** Demo panel "Reset everything": back to wall time at normal speed, then one tick. */
+  resetNow(): void;
   /** Milliseconds from an arbitrary origin; unaffected by setNow, speed or wall-clock changes. */
   monotonic(): number;
   /** Stop the timer and drop every subscriber. */
@@ -98,6 +100,12 @@ export function createClock(deps: ClockDeps = {}): RealClock {
     },
     speed: () => speed,
     tick() {
+      ticks.emit(now());
+    },
+    resetNow() {
+      reanchor(wallNow());
+      speed = 1;
+      if (handle !== null) startTimer();
       ticks.emit(now());
     },
     monotonic: monoNow,
