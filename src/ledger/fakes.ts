@@ -11,19 +11,11 @@ import type {
   Scope,
   Seed,
   SpendResult,
-  TaskType,
 } from '../contracts';
 import { createEmitter, MIN } from '../shared/emitter';
+import { EARNING } from './economy';
 
-/** Minutes minted per verified quest — "Earning" table in the planning doc. */
-export const EARNING: Record<TaskType, number> = {
-  fitness: 25,
-  place: 25,
-  meetup: 25,
-  study: 20,
-  coding: 20,
-  focus: 15,
-};
+export { EARNING } from './economy';
 
 const START_BALANCE = 30; // fake only; the real ledger starts each day at 0
 
