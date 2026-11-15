@@ -1,6 +1,7 @@
 // OWNER: A (Spec A — Device). See docs/specs/A-device.md.
 // Provides: UsageFeed, DeviceSignals (the contract) + `kit`, everything else A's own screens need.
 // Consumes (via get()): Clock, PostureSource, Ledger, Governor, Planner, Quests.
+import { Platform } from 'react-native';
 import type { GetServices } from '../contracts';
 import { createFakeDevice } from './fakes';
 
@@ -10,11 +11,12 @@ import { createFakeDevice } from './fakes';
  */
 export const USE_REAL = true;
 
-/** Jest has no native modules (expo-app-blocker and co.), so tests always run the device on fakes. */
+/** Jest and the web preview have no native modules (expo-app-blocker and co.), so they always run the device on fakes. */
 const isJest = () => typeof process !== 'undefined' && process.env?.JEST_WORKER_ID != null;
+const hasNativeModules = () => Platform.OS !== 'web' && !isJest();
 
 export function createDevice(get: GetServices) {
-  if (USE_REAL && !isJest()) return createRealDeviceLazily(get);
+  if (USE_REAL && hasNativeModules()) return createRealDeviceLazily(get);
   return createFakeDevice(get);
 }
 
