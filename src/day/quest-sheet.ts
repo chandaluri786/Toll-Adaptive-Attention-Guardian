@@ -6,6 +6,7 @@ import { asSentence, formatCount, formatMinSec } from './format';
 import type { CaptureVerdict } from './meetup-capture';
 import { CHIP_ORDER, payFor, QUEST_COPY } from './quest-copy';
 import { QUEST_TARGETS } from './quest-rules';
+import type { QuizRound } from './quiz-bank';
 import type { AcceptResult, LiveReadout, Offer, VerifyResult } from './quests';
 import { AWAY_RADIUS_M } from './verifiers';
 import type { MeetupCode } from './wordlist';
@@ -26,6 +27,9 @@ export type SheetPort = {
   claimHalf(questId: string): VerifyResult;
   abandon(questId: string): void;
   meetup(questId: string): MeetupContext | null;
+  /** B10: the open round of a study quest (null = no questions, or waiting out a miss). */
+  quizRound?(questId: string): QuizRound | null;
+  answerQuiz?(questId: string, answers: readonly number[]): VerifyResult;
   /** Fakes only: show the not-yet state on demand (the stub sensors never miss). */
   simulateMiss?(questId: string): VerifyResult;
 };

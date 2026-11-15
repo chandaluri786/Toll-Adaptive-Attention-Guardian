@@ -50,9 +50,9 @@ export const QUEST_COPY: Record<TaskType, QuestCopy> = {
     offerTitle: 'Quick quiz',
     activeTitle: 'Quiz',
     chip: 'Quiz',
-    checks: ["Three questions on today's topic", LOCAL, NO_RUSH],
+    checks: ["Three questions on today's topic", '90 seconds · 2 right to pass', 'Your answers stay on this phone'],
     passHeadline: 'Quiz done.',
-    missHint: null,
+    missHint: 'The next try draws three new questions.',
   },
   coding: {
     offerTitle: 'Push a commit',
