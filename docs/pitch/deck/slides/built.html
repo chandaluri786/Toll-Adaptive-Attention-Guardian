@@ -1,0 +1,19 @@
+<section id="built" class="night" data-transition="fade">
+<h2 class="rise">Built in 24 hours.</h2>
+<div class="stats">
+<div class="stat rise" style="--i:1"><p class="n">3</p><p class="l">builders, in parallel</p></div>
+<div class="stat rise" style="--i:2"><p class="n">1</p><p class="l">shared contract</p></div>
+<div class="stat rise" style="--i:3"><p class="n">760+</p><p class="l">automated tests</p></div>
+</div>
+<div class="chips rise" style="--i:4">
+<p class="chip">React Native + Expo</p>
+<p class="chip">TypeScript</p>
+<p class="chip">Android usage stats + overlay</p>
+<p class="chip">On-device OCR</p>
+<p class="chip">Step counter · location</p>
+<p class="chip">On-phone storage</p>
+<p class="chip">AWS Lambda + DynamoDB</p>
+<p class="chip">Claude on Amazon Bedrock</p>
+</div>
+<aside>[Presenter 1 · 35 s] "Three of us built this in parallel. We started by writing one shared contract, every interface between the device layer, the day-and-quests layer and the engine, and a fake for each, so nobody waited on anyone. Integration was flipping one switch per module. It’s React Native on Expo SDK 58 in TypeScript, with expo-app-blocker for Android usage stats and the overlay, the step counter and location for quests, Google ML Kit for on-device text recognition, MMKV for storage on the phone, and a small AWS backend: Lambda, API Gateway and DynamoDB keep your umbrella-time ledger in sync, and a second Lambda calls Claude on Amazon Bedrock to write the study quizzes. All the decisions, scoring, the economy, the blocking plan, fail-open, are pure functions with over 760 automated tests, so we could prove the rules without a phone." We ran the real flow on a Samsung S25 Ultra.</aside>
+</section>
