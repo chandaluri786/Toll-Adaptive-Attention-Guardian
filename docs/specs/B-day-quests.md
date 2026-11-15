@@ -57,7 +57,7 @@ When B is done, a user can:
 | B8 | Quest sheet | Offer → in progress (live readout) → result, over any screen incl. the Storm screen; coins drop on pass; never red, never "failed" | 2h | P0 |
 | B9 | Today screen | Weather + reason, umbrella time, free-time meter, tasks or the no-plan state, one suggested quest | 2h | P0 |
 | B10 | Quiz + `cloud/quiz` Lambda | One request carries the day's topics; schema check, one retry, fall back to focus; works offline; 3 of 9, 90 s, pass at 2 | 2.5h | P1 |
-| B11 | GitHub verifier | Baseline commit count, polled every 5 min, passes on any increase | 1h | P1 |
+| B11 | GitHub verifier | Baseline commit count, polled every 5 min, passes on any increase. Public REST API, no auth: owner/repo (default branch) or username (commit search); only the name is sent | 1h | P1 |
 
 Build B1–B4 first. Three working verifiers beat six half-working ones.
 
