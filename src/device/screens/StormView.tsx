@@ -45,7 +45,7 @@ export function StormView(p: StormViewProps) {
 
 // ---- the main screen -------------------------------------------------------------------------------
 
-function Block({ vm, posture, emergencyStep, topInset = 0, onDoor, onEmergency, mode }: StormViewProps & { mode: 'light' | 'dark' }) {
+function Block({ vm, posture, emergencyStep, topInset = 0, onDoor, onEmergency, onOpenApp, mode }: StormViewProps & { mode: 'light' | 'dark' }) {
   const t = useTheme();
   const sky = useSky(posture);
   const storm = posture === 'sealed';
@@ -94,14 +94,19 @@ function Block({ vm, posture, emergencyStep, topInset = 0, onDoor, onEmergency, 
           </View>
         </View>
 
-        {/* 3. the choices */}
+        {/* 3. the choices (Clear skies has none: just go on in) */}
+        {vm.mode === 'clear' && (
+          <Pressable accessibilityRole="button" onPress={onOpenApp} style={[styles.openApp, { backgroundColor: t.primaryBg, marginTop: 0, alignSelf: 'stretch' }]}>
+            <Text style={{ color: t.primaryText, fontSize: 17, fontFamily: fonts.medium }}>{`Open ${vm.appName}`}</Text>
+          </Pressable>
+        )}
         <View style={{ gap: 10 }}>
           {vm.doors.map((d) => (
             <DoorButton key={d.key} door={d} posture={posture} onPress={() => onDoor(d.key)} />
           ))}
         </View>
 
-        <EmergencyLink vm={vm} step={emergencyStep} onAction={onEmergency} posture={posture} />
+        {vm.mode !== 'clear' && <EmergencyLink vm={vm} step={emergencyStep} onAction={onEmergency} posture={posture} />}
       </View>
 
       {emergencyStep === 'confirming' && <ConfirmDialog onAction={onEmergency} />}

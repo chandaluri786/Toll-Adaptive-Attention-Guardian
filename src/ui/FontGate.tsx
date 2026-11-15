@@ -11,8 +11,21 @@ import {
 import { Roboto_400Regular, Roboto_500Medium, Roboto_700Bold } from '@expo-google-fonts/roboto';
 import { useFonts } from 'expo-font';
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+import { ThemeModeProvider } from './components';
+import type { ThemeMode } from './theme';
 
 const GIVE_UP_AFTER_MS = 3000;
+
+/**
+ * Browser preview only: `?theme=dark` or `?theme=light` forces the theme for the whole app, so it can be linked
+ * and checked without touching browser or system settings. On a phone the app always follows the system.
+ */
+function themeFromUrl(): ThemeMode | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('theme');
+  return v === 'dark' || v === 'light' ? v : null;
+}
 
 export function FontGate({ children }: { children: React.ReactNode }) {
   const [loaded, error] = useFonts({
@@ -30,5 +43,5 @@ export function FontGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!loaded && !error && !timedOut) return null;
-  return <>{children}</>;
+  return <ThemeModeProvider value={themeFromUrl()}>{children}</ThemeModeProvider>;
 }

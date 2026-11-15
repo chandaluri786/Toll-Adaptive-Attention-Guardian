@@ -48,9 +48,12 @@ export type Door = {
 };
 
 export type StormViewModel = {
-  /** 'grace' = only a warning banner over the app; nothing is restricted yet. */
-  mode: 'grace' | 'cloudy' | 'storm';
-  /** The big serif word: "Cloudy" or "Storm". */
+  /**
+   * 'grace' = only a warning banner over the app; nothing is restricted yet.
+   * 'clear' = Clear skies: nothing is restricted, so there is no wait and no choice to make, just "Open <app>".
+   */
+  mode: 'grace' | 'clear' | 'cloudy' | 'storm';
+  /** The big serif word: "Clear skies", "Cloudy" or "Storm". */
   weatherName: string;
   appName: string;
   /** First letter of the app, shown in its little badge. */
@@ -95,7 +98,7 @@ export function stormViewModel(i: StormInput): StormViewModel {
     reason: i.reason,
     clears: i.clearsAt ? `Clears at ${i.clearsAt}` : null,
     // The note says what the umbrella door costs; when there is no umbrella door (a Storm), why.
-    umbrella: { minutes: i.balance, note: decision.canSpend ? `Opening costs ${cost}` : 'Storm takes fresh quest time only' },
+    umbrella: { minutes: i.balance, note: i.posture === 'open' ? 'Saved for when clouds roll in' : decision.canSpend ? `Opening costs ${cost}` : 'Storm takes fresh quest time only' },
     emergency,
   };
 
@@ -108,6 +111,19 @@ export function stormViewModel(i: StormInput): StormViewModel {
       note: null,
       doors: [],
       gather: { title: `Clouds gathering · ${mmss(i.graceLeft ?? 90)}`, body: i.reason },
+    };
+  }
+
+  // Clear skies: nothing is restricted, so nothing is made to wait. (The blocker does not normally show this
+  // screen in Clear skies; it is reachable when the weather clears while the screen is open.)
+  if (i.posture === 'open') {
+    return {
+      ...base,
+      mode: 'clear',
+      weatherName: 'Clear skies',
+      note: 'Nothing is restricted right now.',
+      doors: [],
+      gather: null,
     };
   }
 

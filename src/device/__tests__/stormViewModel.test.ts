@@ -185,3 +185,14 @@ describe('the wait with fractional seconds (ticked every 250 ms)', () => {
     expect(stormViewModel({ ...base, waitLeft: 0 }).doors.find((d) => d.key === 'wait')!.title).toBe("That's a minute");
   });
 });
+
+describe('Clear skies on this screen', () => {
+  it('says Clear skies and makes nobody wait: no doors, no emergency, just open the app', () => {
+    const vm = stormViewModel({ posture: 'open', reason: "Sky's clear. Enjoy it.", grace: false, appName: 'Scrollr', trigger: 'opened', balance: 30, emergencyLeft: 1, clearsAt: null });
+    expect(vm.mode).toBe('clear');
+    expect(vm.weatherName).toBe('Clear skies');
+    expect(vm.doors).toEqual([]);
+    expect(vm.note).toBe('Nothing is restricted right now.');
+    expect(vm.umbrella.note).toBe('Saved for when clouds roll in'); // not the Storm line
+  });
+});

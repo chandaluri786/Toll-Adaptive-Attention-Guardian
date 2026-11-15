@@ -41,3 +41,5 @@ The fake weather lives in memory, so **reloading the page resets it to Clear ski
 
 Try: **Wait 60 seconds** (countdown, filling bar, the sky settles), **Open umbrella** (the opened screen), **Emergency unlock** (tap, tap, confirm; once a day).
 
+**Light or dark in the browser:** add `&theme=dark` (or `theme=light`) to any link, e.g. `/forecast?theme=dark`. Without it the page follows your system setting (changing the DevTools *UI* theme does not count; use DevTools > More tools > Rendering > "Emulate prefers-color-scheme", or your OS setting). On a phone the app always follows the phone.
+
