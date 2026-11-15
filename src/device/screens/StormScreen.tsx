@@ -34,7 +34,7 @@ import { StormView } from './StormView';
 /** `?weather=` values for trying the screen in a browser (fakes only): the three weathers by their user-facing names. */
 const PREVIEW_WEATHER = { clear: 'open', cloudy: 'metered', storm: 'sealed' } as const;
 
-export default function StormScreen({ appName, pkg, reason, weather }: { appName?: string; pkg?: string; reason?: string; weather?: string }) {
+export default function StormScreen({ appName, pkg, reason, weather, balance: previewBalance }: { appName?: string; pkg?: string; reason?: string; weather?: string; balance?: string }) {
   // Browser / demo only: the fake weather lives in memory, so a page reload resets it. `?weather=storm` sets it
   // on load so the screen can be deep-linked. Ignored when the real engine and blocker are running.
   useEffect(() => {
@@ -44,6 +44,14 @@ export default function StormScreen({ appName, pkg, reason, weather }: { appName
       debug.engine.postureSource.setPosture(posture);
     }
   }, [weather]);
+
+  // Same preview-only idea for umbrella time: `?balance=4` sets it. When the screen is opened because the umbrella
+  // just ran out (`reason=expired`) and no balance is given, the fake starts low (3 min), as it would be in real life.
+  useEffect(() => {
+    if (USE_REAL) return;
+    const n = previewBalance !== undefined ? Number(previewBalance) : reason === 'expired' ? 3 : NaN;
+    if (Number.isFinite(n)) debug.ledger.setBalance(n);
+  }, [previewBalance, reason]);
   const state = usePosture();
   const balance = useBalance();
   const insets = useSafeAreaInsets();

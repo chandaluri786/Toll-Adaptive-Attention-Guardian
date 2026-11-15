@@ -43,3 +43,14 @@ Try: **Wait 60 seconds** (countdown, filling bar, the sky settles), **Open umbre
 
 **Light or dark in the browser:** add `&theme=dark` (or `theme=light`) to any link, e.g. `/forecast?theme=dark`. Without it the page follows your system setting (changing the DevTools *UI* theme does not count; use DevTools > More tools > Rendering > "Emulate prefers-color-scheme", or your OS setting). On a phone the app always follows the phone.
 
+**More preview links** (same base, all fakes-only):
+
+| Link | Case |
+| --- | --- |
+| `/blocked?app=Scrollr&package=x&weather=cloudy&reason=expired` | Umbrella just ran out: balance is low (3 min), so the umbrella door is greyed out and a quest is the way on |
+| `/blocked?app=Scrollr&package=x&weather=cloudy&balance=9` | Cloudy, not enough umbrella time ("You need 6 more minutes") |
+| `/blocked?app=Scrollr&package=x&weather=storm&balance=4` | Storm with 4 min: no umbrella door at all (banked minutes cannot open a restricted app in a Storm) |
+| `/blocked?app=Scrollr&package=com.android.chrome&weather=storm` | A discretionary app (browser) in a Storm: the umbrella works, at half price (15 min of access costs 8) |
+
+If a link does not behave as described, you are probably on an old build: `git pull`, then restart with `npx expo start --web --clear`.
+
