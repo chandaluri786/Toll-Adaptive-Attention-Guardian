@@ -7,6 +7,7 @@ import { ScrollView, View } from 'react-native';
 import { debug } from '../../services';
 import { useBalance, usePosture } from '../../shared/hooks';
 import { Button, useTheme, WeatherChip } from '../../ui/components';
+import { Body, Card, Display, Segmented } from '../../ui/primitives';
 import { space } from '../../ui/theme';
 import { weatherFor } from '../../ui/weather';
 import type { Posture, Seed } from '../../contracts';
@@ -24,7 +25,7 @@ import {
   SPEEDS,
 } from '../demo';
 import { formatHm } from '../time';
-import { Body, Card, Choice, ChoiceRow, Muted, ScreenTitle } from './parts';
+import { Choice, Choices } from './parts';
 
 const REFRESH_MS = 1000;
 const WEATHERS: Posture[] = ['open', 'metered', 'sealed'];
@@ -52,7 +53,7 @@ function useClockNow(): number {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
-      <View style={{ gap: space.s, paddingVertical: space.s }}>
+      <View style={{ gap: space.s }}>
         <Body>{title}</Body>
         {children}
       </View>
@@ -83,43 +84,43 @@ export default function DemoPanel() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={{ padding: space.m, paddingTop: space.xl, gap: space.m }}>
-      <ScreenTitle>Demo panel</ScreenTitle>
+    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: space.m, paddingTop: space.xl, gap: space.m }}>
+      <Display>Demo panel</Display>
       <Card>
-        <View style={{ gap: space.xs, paddingVertical: space.s }}>
+        <View style={{ gap: space.xs }}>
           <WeatherChip posture={state.posture} />
           <Body>
             {formatHm(now)} · {speed}× · Focus Pressure {state.score}
             {state.grace ? ' · clouds gathering' : ''}
           </Body>
-          <Muted>
+          <Body muted small>
             Free time left {state.allowanceLeftMin} min · Umbrella time {balance} min
-          </Muted>
+          </Body>
         </View>
       </Card>
 
       <Section title="Time">
-        <ChoiceRow>
-          {SPEEDS.map((x) => (
-            <Choice key={x} label={`${x}×`} selected={speed === x} onPress={() => changeSpeed(x)} />
-          ))}
-        </ChoiceRow>
-        <Muted>At 60× a 3½-minute weather change takes about 4 seconds.</Muted>
-        <ChoiceRow>
+        <Segmented
+          options={SPEEDS.map((x) => ({ id: String(x), label: `${x}×` }))}
+          value={String(speed)}
+          onChange={(id) => changeSpeed(Number(id))}
+        />
+        <Body muted small>At 60× a 3½-minute weather change takes about 4 seconds.</Body>
+        <Choices>
           <Choice label="+15 min" onPress={() => advance(clock, 15)} />
           <Choice label="+1 hour" onPress={() => advance(clock, 60)} />
           <Choice label="14:00" onPress={() => clock.setNow(atLocalTime(clock.now(), 14 * 60))} />
           <Choice label="Check the sky now" onPress={() => clock.tick()} />
-        </ChoiceRow>
+        </Choices>
       </Section>
 
       <Section title="Weather">
-        <ChoiceRow>
+        <Choices>
           {WEATHERS.map((p) => (
             <Choice key={p} label={weatherFor(p).name} selected={state.posture === p} onPress={() => forceWeather(debug, p)} />
           ))}
           {caps.canRelease ? <Choice label="Back to the forecast" onPress={() => forceWeather(debug, null)} /> : null}
-        </ChoiceRow>
+        </Choices>
         <Choice
           label={state.grace ? 'Clouds gathering: on' : 'Clouds gathering: off'}
           selected={state.grace}
@@ -128,23 +129,23 @@ export default function DemoPanel() {
       </Section>
 
       <Section title="Free time and phone use">
-        <ChoiceRow>
+        <Choices>
           <Choice label="Use up free time" onPress={() => setFreeTimeLeft(debug, 0)} />
           <Choice label="−30 min" onPress={() => setFreeTimeLeft(debug, state.allowanceLeftMin - 30)} />
           <Choice label="Full day" onPress={() => setFreeTimeLeft(debug, FULL_FREE_TIME_MIN)} />
-        </ChoiceRow>
-        <ChoiceRow>
+        </Choices>
+        <Choices>
           {caps.canScroll ? <Choice label={scrolling ? 'Stop scrolling' : 'Start scrolling'} selected={scrolling} onPress={toggleScrolling} /> : null}
           {caps.canQuickOpen ? <Choice label="5 quick opens" onPress={() => quickOpens(debug)} /> : null}
-        </ChoiceRow>
+        </Choices>
       </Section>
 
       <Section title="Steps and umbrella time">
-        <ChoiceRow>
+        <Choices>
           <Choice label="+500 steps" onPress={() => debug.day.addSteps(500)} />
           <Choice label="+2,000 steps" onPress={() => debug.day.addSteps(2000)} />
           <Choice label={`Umbrella ${DEMO_UMBRELLA_MIN} min`} onPress={() => debug.ledger.setBalance(DEMO_UMBRELLA_MIN)} />
-        </ChoiceRow>
+        </Choices>
       </Section>
 
       <Section title="Start from">

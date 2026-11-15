@@ -7,11 +7,15 @@ import RestrictedAppsSection from '../../device/screens/RestrictedAppsSection';
 import PlannerSection from '../../day/components/PlannerSection';
 import { debug } from '../../services';
 import { useTheme } from '../../ui/components';
+import { Body, Card, Display } from '../../ui/primitives';
 import { space } from '../../ui/theme';
 import { FREE_TIME_MIN } from '../freeTime';
 import { COPY, thresholdSummary, weatherStoreOr } from '../thresholds';
 import EngineSection from './EngineSection';
-import { Card, Divider, DisclosureRow, Muted, ScreenTitle } from './parts';
+import { Divider, DisclosureRow } from './parts';
+
+// Rows sit flush inside the card; the rows carry their own vertical padding.
+const ROW_CARD = { paddingVertical: space.xs, gap: 0 };
 
 type SectionId = 'apps' | 'planner' | 'weather' | 'demo';
 
@@ -26,11 +30,12 @@ export default function SettingsContainer() {
   const config = useSyncExternalStore(store.subscribe, store.get);
 
   return (
-    <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={{ padding: space.m, paddingTop: space.xl, gap: space.m }}>
-      <ScreenTitle>Settings</ScreenTitle>
+    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: space.m + 2, paddingTop: space.xl, gap: space.m - 2 }}>
+      <Display>Settings</Display>
 
-      <Card>
+      <Card style={ROW_CARD}>
         <DisclosureRow
+          icon="smartphone"
           title="Distracting apps"
           subtitle="And up to 2 messaging apps that never cloud over"
           open={expanded === 'apps'}
@@ -38,10 +43,13 @@ export default function SettingsContainer() {
         />
         {expanded === 'apps' ? <View style={{ paddingBottom: space.m }}><RestrictedAppsSection /></View> : null}
       </Card>
-      <Muted>{ALWAYS_AVAILABLE}</Muted>
+      <View style={{ paddingHorizontal: space.xs }}>
+        <Body muted small>{ALWAYS_AVAILABLE}</Body>
+      </View>
 
-      <Card>
+      <Card style={ROW_CARD}>
         <DisclosureRow
+          icon="house"
           title="Home, sleep window and timetable"
           subtitle="Your blocks are the only place a storm can form"
           open={expanded === 'planner'}
@@ -50,8 +58,9 @@ export default function SettingsContainer() {
         {expanded === 'planner' ? <View style={{ paddingBottom: space.m }}><PlannerSection /></View> : null}
       </Card>
 
-      <Card>
+      <Card style={ROW_CARD}>
         <DisclosureRow
+          icon="cloud"
           title={COPY.title}
           subtitle={thresholdSummary(config, FREE_TIME_MIN)}
           open={expanded === 'weather'}
@@ -60,8 +69,8 @@ export default function SettingsContainer() {
         {expanded === 'weather' ? <View style={{ paddingBottom: space.m }}><EngineSection /></View> : null}
       </Card>
 
-      <Card>
-        <DisclosureRow title="For the demo" subtitle="Demo panel and screen previews" open={expanded === 'demo'} onToggle={() => toggle('demo')} />
+      <Card style={ROW_CARD}>
+        <DisclosureRow icon="sparkles" title="For the demo" subtitle="Demo panel and screen previews" open={expanded === 'demo'} onToggle={() => toggle('demo')} />
         {expanded === 'demo' ? (
           <View>
             <Divider />
