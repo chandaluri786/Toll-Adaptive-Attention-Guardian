@@ -21,7 +21,7 @@ function BlockRow({ block }: { block: WeeklyBlock }) {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
       <View style={{ flex: 1 }}>
         <Text style={{ color: t.text, fontSize: font.body }}>{block.title}</Text>
-        <Text style={{ color: t.textMuted, fontSize: font.small }}>
+        <Text style={{ color: t.muted, fontSize: font.small }}>
           {BLOCK_LABELS[block.type]} · {days} · {formatHHMM(block.startMin)}–{formatHHMM(block.endMin)}
         </Text>
       </View>

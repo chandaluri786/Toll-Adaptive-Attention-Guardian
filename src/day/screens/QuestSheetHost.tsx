@@ -94,10 +94,10 @@ export default function QuestSheetHost() {
       {/* The sheet sits over whatever opened it (Today or the Storm screen); tap above it to close. */}
       <Pressable accessibilityLabel="Close quest sheet" style={{ flex: 1 }} onPress={close} />
       <ScrollView
-        style={{ flexGrow: 0, maxHeight: '88%', backgroundColor: t.surface, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l }}
+        style={{ flexGrow: 0, maxHeight: '88%', backgroundColor: t.card, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l }}
         contentContainerStyle={{ padding: space.l - 2, paddingTop: space.s + 2, gap: space.m }}
       >
-        <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: t.border }} />
+        <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: t.divider }} />
         {body}
       </ScrollView>
     </Modal>

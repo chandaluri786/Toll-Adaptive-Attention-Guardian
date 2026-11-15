@@ -27,7 +27,7 @@ export default function TaskDraftRow(props: {
   const t = useTheme();
   const { task, onChange } = props;
   return (
-    <View style={{ gap: space.s, padding: space.s, borderWidth: 1, borderColor: t.border, borderRadius: radius.m }}>
+    <View style={{ gap: space.s, padding: space.s, borderWidth: 1, borderColor: t.divider, borderRadius: radius.m }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
         {TASK_TYPES.map((ty) => (
           <Chip key={ty} label={TASK_LABELS[ty]} selected={task.type === ty} onPress={() => onChange({ ...task, type: ty })} />

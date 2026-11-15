@@ -1,12 +1,16 @@
 // OWNER: B (Spec B — task B2). Optional, never forced: opened from the morning/noon reminder or
 // Today. 1–7 typed tasks; locks 30 min after Start; "Not today" always visible.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, ScrollView, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import services from '../../services';
 import { Button, useTheme } from '../../ui/components';
-import { space, type as font } from '../../ui/theme';
+import { Icon } from '../../ui/Icon';
+import { Display } from '../../ui/primitives';
+import { fonts, radius, space, touch, type as font } from '../../ui/theme';
 import TaskDraftRow, { type DraftTask } from '../components/TaskDraftRow';
 import { Note, SectionTitle } from '../components/fields';
+import { TextLink } from '../components/sheet/SheetParts';
+import { TASK_ICON } from '../components/taskIcon';
 import { planSheetRequests } from '../fakes';
 import { createPlanActions, forecastLine, isLocked, MAX_TASKS, TASK_LABELS, yesterdaysUnfinished, type NewTask } from '../plan';
 import { todaysPlan, type DayPlan } from '../planner';
@@ -81,18 +85,32 @@ function StartedPlan({ plan }: { plan: DayPlan }) {
   return (
     <View style={{ gap: space.m }}>
       <Note>{locked ? 'Locked in for today. New tasks earn half.' : LOCK_NOTE}</Note>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>Tasks</Text>
+        <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>{`${plan.tasks.length} of ${MAX_TASKS}`}</Text>
+      </View>
       {plan.tasks.map((task) => (
-        <View key={task.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: t.text, fontSize: font.body }}>{task.title}</Text>
-            <Text style={{ color: t.textMuted, fontSize: font.small }}>
+        <View key={task.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.m, backgroundColor: t.surface, borderRadius: radius.m, paddingLeft: space.m, minHeight: touch.min + 12 }}>
+          <Icon name={TASK_ICON[task.type]} size={20} color={t.muted} />
+          <View style={{ flex: 1, paddingVertical: space.s }}>
+            <Text style={{ color: t.text, fontSize: font.body, fontFamily: fonts.body }}>{task.title}</Text>
+            <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>
               {TASK_LABELS[task.type]}
               {task.topic ? ` · ${task.topic}` : ''}
               {task.rate === 0.5 ? ' · earns half' : ''}
               {task.done === 1 ? ' · done' : task.done === 0.5 ? ' · half done' : ''}
             </Text>
           </View>
-          {!locked && plan.tasks.length > 1 ? <Button title="Remove" onPress={() => remove(task.id)} /> : null}
+          {!locked && plan.tasks.length > 1 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${task.title}`}
+              onPress={() => remove(task.id)}
+              style={{ width: touch.min + 4, minHeight: touch.min, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="x" size={20} color={t.muted} />
+            </Pressable>
+          ) : null}
         </View>
       ))}
       {plan.tasks.length < MAX_TASKS ? (
@@ -123,12 +141,15 @@ export default function PlanMyDaySheet() {
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <View style={{ maxHeight: '90%', backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22 }}>
+        <View style={{ maxHeight: '90%', backgroundColor: t.card, borderTopLeftRadius: radius.l, borderTopRightRadius: radius.l }}>
           <ScrollView contentContainerStyle={{ padding: space.l, gap: space.m }} keyboardShouldPersistTaps="handled">
-            <Text style={{ color: t.text, fontSize: font.title, fontWeight: '700' }}>Plan my day</Text>
-            <Text style={{ color: t.textMuted, fontSize: font.body }}>{forecastLine(state, now())}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.m }}>
+              <Display>Plan my day</Display>
+              <TextLink gold title={plan ? 'Close' : 'Not today'} onPress={plan ? close : notToday} />
+            </View>
+            <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>{"Today's forecast"}</Text>
+            <Text style={{ color: t.text, fontSize: font.body, fontFamily: fonts.body }}>{forecastLine(state, now())}</Text>
             {open && (plan ? <StartedPlan plan={plan} /> : <NewPlan onDone={close} />)}
-            <Button title={plan ? 'Close' : 'Not today'} onPress={plan ? close : notToday} />
           </ScrollView>
         </View>
       </View>

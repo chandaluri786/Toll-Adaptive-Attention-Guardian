@@ -3,7 +3,10 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTheme } from '../../../ui/components';
-import { radius, space, touch, type as font } from '../../../ui/theme';
+import { Icon } from '../../../ui/Icon';
+import { Mascot } from '../../../ui/Mascot';
+import { Display } from '../../../ui/primitives';
+import { fonts, radius, space, touch, type as font } from '../../../ui/theme';
 import type { NotYetView } from '../../quest-sheet';
 import { TextLink } from './SheetParts';
 
@@ -13,22 +16,23 @@ export function QuestNotYet({ view, onRetry, onClaimHalf }: Props) {
   const t = useTheme();
   return (
     <View style={{ gap: space.m, alignItems: 'stretch' }}>
-      {/* DESIGN: <Mascot mood="calm" /> above the title when src/ui ships it */}
-      {/* DESIGN: title in fonts.display (Cormorant 500, ~40) */}
-      <Text style={{ color: t.text, fontSize: 36, textAlign: 'center' }}>Not quite yet</Text>
-      <View style={{ backgroundColor: t.background, borderRadius: radius.m + 4, padding: space.m }}>
-        {/* DESIGN: map-pin / type icon before the reason */}
-        <Text style={{ color: t.text, fontSize: font.body + 2 }}>{view.reason}</Text>
+      <View style={{ alignItems: 'center', gap: space.s }}>
+        <Mascot mood="calm" size={64} />
+        <Display>Not quite yet</Display>
       </View>
-      {!!view.hint && <Text style={{ color: t.textMuted, fontSize: font.body, textAlign: 'center' }}>{view.hint}</Text>}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.s + 2, backgroundColor: t.surface, borderRadius: radius.m + 4, padding: space.m }}>
+        <Icon name="info" size={20} color={t.muted} />
+        <Text style={{ flex: 1, color: t.text, fontSize: font.body + 2, fontFamily: fonts.body }}>{view.reason}</Text>
+      </View>
+      {!!view.hint && <Text style={{ color: t.muted, fontSize: font.body, fontFamily: fonts.body, textAlign: 'center' }}>{view.hint}</Text>}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: !view.retry.ready }}
         disabled={!view.retry.ready}
         onPress={onRetry}
-        style={{ minHeight: touch.min + 8, borderRadius: radius.m, borderWidth: 1, borderStyle: 'dashed', borderColor: t.border, alignItems: 'center', justifyContent: 'center' }}
+        style={{ minHeight: touch.min + 8, borderRadius: radius.m, borderWidth: 1, borderStyle: 'dashed', borderColor: t.divider, alignItems: 'center', justifyContent: 'center' }}
       >
-        <Text style={{ color: t.text, fontSize: font.body + 1 }}>{view.retry.label}</Text>
+        <Text style={{ color: t.text, fontSize: font.body + 1, fontFamily: fonts.medium }}>{view.retry.label}</Text>
       </Pressable>
       {!!view.claimHalf && <TextLink title={view.claimHalf} onPress={onClaimHalf} underline gold />}
     </View>

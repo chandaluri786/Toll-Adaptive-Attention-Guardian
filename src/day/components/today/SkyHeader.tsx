@@ -1,30 +1,49 @@
-// OWNER: B (task B9). Today's top (2.1–2.5): weather chip, the weather word, reason, next change.
-// DESIGN: swap the flat sky colour for <SkyScene posture quiet /> + useSky(posture), add
-// <Mascot mood="happy|calm" /> on the right and the sun/cloud/cloud-lightning chip icon via
-// src/ui/Icon, and set the word in fonts.display (Cormorant 500, 68/65) when src/ui ships them.
+// OWNER: B (task B9). Today's top (2.1–2.5): A's quiet SkyScene behind the weather chip, the weather
+// word in the display serif, the mascot on the right, the reason, and the next change with a clock.
+// Colours come from useSky(posture), so the text stays legible on every sky in light and dark.
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Posture } from '../../../contracts';
-import { useSky } from '../../../ui/components';
-import { radius, space, type as font } from '../../../ui/theme';
+import { ReasonLine, useSky, WeatherChip } from '../../../ui/components';
+import { Icon } from '../../../ui/Icon';
+import { Mascot, type MascotMood } from '../../../ui/Mascot';
+import { SkyScene } from '../../../ui/SkyScene';
+import { fonts, space, type as font } from '../../../ui/theme';
 
-type Props = { posture: Posture; chip: string; name: string; reason: string; nextLine: string | null };
+type Props = { posture: Posture; name: string; reason: string; nextLine: string | null };
 
-export function SkyHeader({ posture, chip, name, reason, nextLine }: Props) {
+/** The mascot reacts to the weather (DESIGN.md): happy when clear, calm when cloudy, sleepy in a storm. */
+const MOOD: Record<Posture, MascotMood> = { open: 'happy', metered: 'calm', sealed: 'sleepy' };
+const MASCOT_SIZE = 64;
+/** Room under the text for the content sheet's rounded top, which overlaps the sky. */
+const SHEET_OVERLAP = space.xl + space.s;
+
+export function SkyHeader({ posture, name, reason, nextLine }: Props) {
   const sky = useSky(posture);
   const insets = useSafeAreaInsets();
   return (
-    <View style={{ backgroundColor: sky.top, paddingTop: insets.top + space.m, paddingHorizontal: space.l - 4, paddingBottom: space.xl + space.s, gap: space.s }}>
-      <View style={{ alignSelf: 'flex-start', backgroundColor: sky.chip, borderRadius: radius.pill, paddingHorizontal: space.m, paddingVertical: space.s }}>
-        <Text style={{ color: sky.on, fontSize: font.body }}>{chip}</Text>
+    <View style={{ overflow: 'hidden', backgroundColor: sky.top }}>
+      <SkyScene posture={posture} quiet />
+      <View style={{ paddingTop: insets.top + space.m, paddingHorizontal: space.l - 4, paddingBottom: SHEET_OVERLAP, gap: space.s }}>
+        <WeatherChip posture={posture} />
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: space.xl + space.l }}>
+          <Text
+            accessibilityRole="header"
+            style={{ flex: 1, color: sky.on, fontSize: font.weather, lineHeight: font.weather - 3, fontFamily: fonts.display, letterSpacing: -0.6 }}
+          >
+            {name}
+          </Text>
+          <Mascot mood={MOOD[posture]} size={MASCOT_SIZE} />
+        </View>
+        <ReasonLine text={reason} color={sky.on} />
+        {!!nextLine && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s - 2 }}>
+            <Icon name="clock" size={16} color={sky.onMuted} />
+            <Text style={{ color: sky.onMuted, fontSize: font.body, fontFamily: fonts.body }}>{nextLine}</Text>
+          </View>
+        )}
       </View>
-      <Text accessibilityRole="header" style={{ color: sky.on, fontSize: 60, lineHeight: 66, marginTop: space.l }}>
-        {name}
-      </Text>
-      <Text style={{ color: sky.on, fontSize: 20, fontWeight: '500' }}>{reason}</Text>
-      {/* DESIGN: clock icon before the next-change line */}
-      {!!nextLine && <Text style={{ color: sky.onMuted, fontSize: font.body }}>{nextLine}</Text>}
     </View>
   );
 }

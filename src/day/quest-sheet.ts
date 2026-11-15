@@ -89,7 +89,7 @@ export function onVerifiedPhase(phase: Phase, q: Quest, v: Verdict, minted: numb
 // ---- view models ----
 
 export type OfferChip = { type: TaskType; label: string; pays: string; disabled: boolean };
-export type OfferView = { title: string; pays: string; checks: string[]; blocked: string | null; others: OfferChip[] };
+export type OfferView = { type: TaskType; title: string; pays: string; checks: string[]; blocked: string | null; others: OfferChip[] };
 
 export function offerView(port: SheetPort, phase: Extract<Phase, { kind: 'offer' }>): OfferView {
   const copy = QUEST_COPY[phase.type];
@@ -100,6 +100,7 @@ export function offerView(port: SheetPort, phase: Extract<Phase, { kind: 'offer'
     disabled: port.blockedReason(t) !== null,
   }));
   return {
+    type: phase.type,
     title: copy.offerTitle,
     pays: `Pays ${payFor(phase.type, port.taskRate(phase.taskId))} min of umbrella time`,
     checks: copy.checks,

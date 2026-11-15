@@ -3,10 +3,13 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Button, useTheme } from '../../../ui/components';
-import { radius, space, type as font } from '../../../ui/theme';
+import { Icon } from '../../../ui/Icon';
+import { IconDisc } from '../../../ui/primitives';
+import { fonts, radius, space, type as font } from '../../../ui/theme';
 import type { TaskType } from '../../../contracts';
 import { OFFER_FOOTER } from '../../quest-copy';
 import type { OfferView } from '../../quest-sheet';
+import { TASK_ICON } from '../taskIcon';
 import { Hairline, QuestChip } from './SheetParts';
 
 type Props = { view: OfferView; onStart: () => void; onPick: (type: TaskType) => void };
@@ -16,38 +19,36 @@ export function QuestOffer({ view, onStart, onPick }: Props) {
   return (
     <View style={{ gap: space.m }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.m }}>
-        {/* DESIGN: quest type icon in a round gold-tint badge via src/ui/Icon when it ships */}
-        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.background }} />
+        <IconDisc name={TASK_ICON[view.type]} size={48} bg={t.goldTint} color={t.goldText} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: t.textMuted, fontSize: font.small }}>Quest</Text>
-          <Text style={{ color: t.text, fontSize: font.title, fontWeight: '500' }}>{view.title}</Text>
+          <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>Quest</Text>
+          <Text style={{ color: t.text, fontSize: font.title, fontFamily: fonts.medium }}>{view.title}</Text>
         </View>
       </View>
-      <View style={{ alignSelf: 'flex-start', backgroundColor: t.background, borderRadius: radius.pill, paddingHorizontal: space.m - 2, paddingVertical: space.s }}>
-        {/* DESIGN: umbrella icon + goldText on the gold tint */}
-        <Text style={{ color: t.umbrella, fontSize: font.body, fontWeight: '500' }}>{view.pays}</Text>
+      <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: space.s, backgroundColor: t.goldTint, borderRadius: radius.pill, paddingHorizontal: space.m - 2, paddingVertical: space.s }}>
+        <Icon name="umbrella" size={18} color={t.goldTintText} />
+        <Text style={{ color: t.goldTintText, fontSize: font.body, fontFamily: fonts.medium }}>{view.pays}</Text>
       </View>
       <Hairline />
-      <Text style={{ color: t.textMuted, fontSize: font.small }}>What we check</Text>
+      <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>What we check</Text>
       {view.checks.map((c) => (
-        <Text key={c} style={{ color: t.text, fontSize: font.body }}>
+        <Text key={c} style={{ color: t.text, fontSize: font.body, fontFamily: fonts.body }}>
           {c}
         </Text>
       ))}
       <Hairline />
       {view.blocked ? (
-        <Text style={{ color: t.textMuted, fontSize: font.body }}>{view.blocked}</Text>
+        <Text style={{ color: t.muted, fontSize: font.body, fontFamily: fonts.body }}>{view.blocked}</Text>
       ) : (
-        // DESIGN: peach primary button (primaryBg / primaryText) when the tokens ship.
         <Button primary title="Start quest" onPress={onStart} />
       )}
-      <Text style={{ color: t.textMuted, fontSize: font.small }}>Other quests</Text>
+      <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>Other quests</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s + 2 }}>
         {view.others.map((c) => (
-          <QuestChip key={c.type} label={c.label} pays={c.pays} disabled={c.disabled} onPress={() => onPick(c.type)} />
+          <QuestChip key={c.type} icon={TASK_ICON[c.type]} label={c.label} pays={c.pays} disabled={c.disabled} onPress={() => onPick(c.type)} />
         ))}
       </View>
-      <Text style={{ color: t.textMuted, fontSize: font.small }}>{OFFER_FOOTER}</Text>
+      <Text style={{ color: t.muted, fontSize: font.small, fontFamily: fonts.body }}>{OFFER_FOOTER}</Text>
     </View>
   );
 }

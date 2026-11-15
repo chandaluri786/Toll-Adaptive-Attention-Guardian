@@ -4,7 +4,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, useTheme } from '../../ui/components';
-import { space, type as font } from '../../ui/theme';
+import { fonts, space, type as font } from '../../ui/theme';
 import { deleteCapturedPhoto } from '../capture-files';
 import { MeetupCodeCard } from '../components/MeetupCodeCard';
 import { createMeetupCapture, type CaptureOutcome, type CaptureVerdict } from '../meetup-capture';
@@ -72,12 +72,12 @@ export function MeetupFlow({ code, questStartedAt, now, submit, practice = false
 
   if (step.kind === 'code') return <MeetupCodeCard code={code} onOpenCamera={() => setStep({ kind: 'camera', notice: null })} />;
 
-  const readLine = practice && lastRead.current ? <Text style={{ color: t.textMuted, fontSize: font.body }}>Phone read: {lastRead.current}</Text> : null;
+  const readLine = practice && lastRead.current ? <Text style={{ color: t.muted, fontSize: font.body }}>Phone read: {lastRead.current}</Text> : null;
 
   if (step.kind === 'done') {
     return (
       <View style={{ gap: space.m }}>
-        <Text style={{ color: t.text, fontSize: font.title, fontWeight: '600' }}>{step.text}</Text>
+        <Text style={{ color: t.text, fontSize: font.title, fontFamily: fonts.medium }}>{step.text}</Text>
         {readLine}
         <Button primary title="Close" onPress={onClose} />
       </View>

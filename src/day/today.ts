@@ -38,7 +38,7 @@ export type TaskStatus =
   | { kind: 'live'; label: string }
   | { kind: 'verify'; questType: TaskType }
   | { kind: 'later'; label: string };
-export type TaskRow = { id: string; title: string; meta: string; status: TaskStatus };
+export type TaskRow = { id: string; type: TaskType; title: string; meta: string; status: TaskStatus };
 
 export type TodayView = {
   chip: string;
@@ -95,6 +95,7 @@ function taskRows(input: TodayInput): TodayView['tasks'] {
   if (total === 0) return { kind: 'none' };
   const rows = (input.tasks ?? []).map((t) => ({
     id: t.id,
+    type: t.type,
     title: t.title,
     meta: `${TASK_LABELS[t.type]} · pays ${payFor(questTypeFor(t.type) ?? t.type, t.rate)} min`,
     status: taskStatus(t, input.liveByTask[t.id]),

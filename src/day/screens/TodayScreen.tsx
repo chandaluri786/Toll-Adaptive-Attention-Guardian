@@ -82,9 +82,9 @@ export default function TodayScreen() {
   const openSheet = (offer?: { type: Offer['type']; taskId?: string }) => sheetRequests.emit({ from: 'today', posture: state.posture, ...(offer ? { offer } : {}) });
 
   return (
-    <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={{ paddingBottom: space.xl }}>
-      <SkyHeader posture={state.posture} chip={view.chip} name={view.weatherName} reason={view.reason} nextLine={view.nextLine} />
-      <View style={{ marginTop: -space.l, borderTopLeftRadius: radius.l + 8, borderTopRightRadius: radius.l + 8, backgroundColor: t.background, padding: space.m, gap: space.m - 2 }}>
+    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ paddingBottom: space.xl }}>
+      <SkyHeader posture={state.posture} name={view.weatherName} reason={view.reason} nextLine={view.nextLine} />
+      <View style={{ marginTop: -space.l, borderTopLeftRadius: radius.l + 8, borderTopRightRadius: radius.l + 8, backgroundColor: t.bg, padding: space.m, gap: space.m - 2 }}>
         <UmbrellaCard u={view.umbrella} />
         <FreeTimeCard f={view.free} />
         <TaskList

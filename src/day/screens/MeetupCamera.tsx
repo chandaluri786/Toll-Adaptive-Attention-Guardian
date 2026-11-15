@@ -5,7 +5,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Button, useSky, useTheme } from '../../ui/components';
-import { radius, space, touch, type as font } from '../../ui/theme';
+import { fonts, radius, space, touch, type as font } from '../../ui/theme';
 import { formatCode } from '../components/MeetupCodeCard';
 import type { MeetupCode } from '../wordlist';
 
@@ -32,8 +32,8 @@ function Header({ code }: { code: MeetupCode }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.s }}>
-      <Text style={{ color: t.text, fontSize: font.title, fontWeight: '600' }}>Snap the code</Text>
-      <Text style={{ color: t.textMuted, fontSize: font.small, letterSpacing: 1, flexShrink: 1 }}>{formatCode(code)}</Text>
+      <Text style={{ color: t.text, fontSize: font.title, fontFamily: fonts.medium }}>Snap the code</Text>
+      <Text style={{ color: t.muted, fontSize: font.small, letterSpacing: 1, flexShrink: 1 }}>{formatCode(code)}</Text>
     </View>
   );
 }
@@ -65,7 +65,7 @@ export function MeetupCamera({ code, busy, notice, onShot, onRetake }: Props) {
     }
   };
 
-  if (!permission) return <ActivityIndicator color={t.umbrella} />;
+  if (!permission) return <ActivityIndicator color={t.gold} />;
   if (!permission.granted) return <PermissionAsk onAllow={() => void requestPermission()} />;
 
   return (
@@ -78,15 +78,15 @@ export function MeetupCamera({ code, busy, notice, onShot, onRetake }: Props) {
           <Text style={{ color: storm.on, fontSize: font.small, textAlign: 'center' }}>Fit the paper inside the frame</Text>
         </View>
         {!!notice && (
-          <View accessibilityLiveRegion="polite" style={{ position: 'absolute', top: space.m, left: space.m, right: space.m, backgroundColor: t.surface, borderRadius: radius.m, padding: space.m }}>
+          <View accessibilityLiveRegion="polite" style={{ position: 'absolute', top: space.m, left: space.m, right: space.m, backgroundColor: t.card, borderRadius: radius.m, padding: space.m }}>
             <Text style={{ color: t.text, fontSize: font.body }}>{notice}</Text>
           </View>
         )}
       </View>
       {busy ? (
         <View style={{ minHeight: SHUTTER, alignItems: 'center', justifyContent: 'center', gap: space.s }}>
-          <ActivityIndicator color={t.umbrella} />
-          <Text style={{ color: t.textMuted, fontSize: font.body }}>Reading it on your phone…</Text>
+          <ActivityIndicator color={t.gold} />
+          <Text style={{ color: t.muted, fontSize: font.body }}>Reading it on your phone…</Text>
         </View>
       ) : notice ? (
         <Button primary title="Retake" onPress={onRetake} />

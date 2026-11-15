@@ -3,9 +3,12 @@
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, View } from 'react-native';
-import { Button, useTheme } from '../../../ui/components';
-import { space, type as font } from '../../../ui/theme';
-import { useReduceMotion } from '../../hooks';
+import { BalanceNumeral, Button, useTheme } from '../../../ui/components';
+import { Icon } from '../../../ui/Icon';
+import { Mascot } from '../../../ui/Mascot';
+import { useReducedMotion, USE_NATIVE_DRIVER } from '../../../ui/motion';
+import { Display } from '../../../ui/primitives';
+import { fonts, space, type as font } from '../../../ui/theme';
 import type { PassView } from '../../quest-sheet';
 import { Bar, Card } from './SheetParts';
 
@@ -13,14 +16,14 @@ const COINS = 3;
 const DROP_MS = 520;
 const STAGGER_MS = 110;
 
-/** DESIGN: swap to src/ui/motion.ts when it ships. */
+/** Three coins fall into the umbrella card. Off under reduce-motion (src/ui/motion). */
 function CoinDrop() {
   const t = useTheme();
-  const reduce = useReduceMotion();
+  const reduce = useReducedMotion();
   const drops = useRef([...Array(COINS)].map(() => new Animated.Value(0))).current;
   useEffect(() => {
     if (reduce) return;
-    const anim = Animated.stagger(STAGGER_MS, drops.map((v) => Animated.timing(v, { toValue: 1, duration: DROP_MS, useNativeDriver: true })));
+    const anim = Animated.stagger(STAGGER_MS, drops.map((v) => Animated.timing(v, { toValue: 1, duration: DROP_MS, useNativeDriver: USE_NATIVE_DRIVER })));
     anim.start();
     return () => anim.stop();
   }, [reduce, drops]);
@@ -34,7 +37,7 @@ function CoinDrop() {
             width: 14,
             height: 14,
             borderRadius: 7,
-            backgroundColor: t.umbrella,
+            backgroundColor: t.gold,
             opacity: v.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 1, 0] }),
             transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [-24, 64] }) }],
           }}
@@ -51,19 +54,19 @@ export function QuestPassed({ view, onDone }: { view: PassView; onDone: () => vo
   }, []);
   return (
     <View style={{ gap: space.m }}>
-      {/* DESIGN: <Mascot mood="celebrate" /> (it hops) when src/ui ships it */}
-      {/* DESIGN: headline in fonts.display (Cormorant 500, ~40) */}
-      <Text style={{ color: t.text, fontSize: 36, textAlign: 'center' }}>{view.headline}</Text>
-      <Text style={{ color: t.textMuted, fontSize: font.body, textAlign: 'center' }}>{view.sub}</Text>
+      <View style={{ alignItems: 'center', gap: space.s }}>
+        <Mascot mood="celebrate" size={72} />
+        <Display>{view.headline}</Display>
+      </View>
+      <Text style={{ color: t.muted, fontSize: font.body, fontFamily: fonts.body, textAlign: 'center' }}>{view.sub}</Text>
       <View>
         <CoinDrop />
         <Card>
-          {/* DESIGN: umbrella icon before the label */}
-          <Text style={{ color: t.textMuted, fontSize: font.body }}>Umbrella time</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.s }}>
-            <Text style={{ color: t.umbrella, fontSize: font.hero, fontWeight: '600' }}>{view.balance}</Text>
-            <Text style={{ color: t.textMuted, fontSize: font.body + 2 }}>minutes</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s }}>
+            <Icon name="umbrella" size={18} color={t.gold} />
+            <Text style={{ color: t.muted, fontSize: font.body, fontFamily: fonts.body }}>Umbrella time</Text>
           </View>
+          <BalanceNumeral minutes={view.balance} />
           <Bar fraction={view.fraction} />
         </Card>
       </View>
