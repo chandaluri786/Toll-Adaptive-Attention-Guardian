@@ -7,6 +7,8 @@ Toll gates distracting apps behind verified real-world accomplishment. Your phon
 
 The doc is the single source for product rules (numbers, thresholds, copy). This repo holds the code, and `docs/` restates what each person builds.
 
+**New to the team? Start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**: setup, hour-0 steps, where each person starts, the timeline and integration.
+
 ## Quick start
 
 ```bash
