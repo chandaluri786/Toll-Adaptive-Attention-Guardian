@@ -20,6 +20,8 @@
       "package": "com.sunhacks.toll"
     },
     "web": {
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "scheme": "toll",
@@ -50,6 +52,12 @@
         "expo-sensors",
         {
           "motionPermission": "Toll counts steps for walking quests."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#00A6A6"
         }
       ]
     ],
