@@ -4,7 +4,7 @@
 import type { Block, Planner, TaskType, Unsub } from '../contracts';
 import { createEmitter } from '../shared/emitter';
 import { readJson, type KV } from './kv';
-import { dayKey, isHHMM, localAt, parseHHMM, windowMinutes } from './time';
+import { dayKey, isHHMM, localAt, minutesOfDay, parseHHMM, windowMinutes } from './time';
 
 export const MAX_BLOCK_MIN = 4 * 60;
 export const MAX_SLEEP_MIN = 10 * 60;
@@ -37,6 +37,9 @@ export type PlanTask = {
   done: 0 | 0.5 | 1; // 0.5 = self-declared ("Claim half")
 };
 export type DayPlan = { day: string; startedAt: number; tasks: PlanTask[] };
+export type ReminderKind = 'morning' | 'noon';
+/** Which reminders already went out on `day`, so each is returned once even across restarts. */
+export type RemindersSent = { day: string; kinds: ReminderKind[] };
 
 export type PlannerState = {
   version: number;
@@ -45,6 +48,8 @@ export type PlannerState = {
   sleep: SleepWindow;
   home: Home | null;
   plan: DayPlan | null;
+  declinedDay: string | null; // planning day the user chose "Not today"
+  reminders: RemindersSent | null;
 };
 
 /** Standing goals from the doc, one per task type. Users revise them rarely. */
@@ -65,7 +70,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
 };
 
 export function defaultState(): PlannerState {
-  return { version: SCHEMA_VERSION, goals: DEFAULT_GOALS, blocks: [], sleep: { ...DEFAULT_SLEEP }, home: null, plan: null };
+  return { version: SCHEMA_VERSION, goals: DEFAULT_GOALS, blocks: [], sleep: { ...DEFAULT_SLEEP }, home: null, plan: null, declinedDay: null, reminders: null };
 }
 
 // ---- validation: returns a friendly message, or null when fine ----
@@ -98,7 +103,10 @@ function loadState(raw: unknown): PlannerState {
   const blocks = Array.isArray(r.blocks) ? r.blocks.filter((b) => b && typeof b.id === 'string' && isNum(b.startMin) && isNum(b.endMin) && Array.isArray(b.days)) : [];
   const goals = Array.isArray(r.goals) && r.goals.length > 0 ? r.goals : base.goals;
   const plan = r.plan && typeof r.plan.day === 'string' && Array.isArray(r.plan.tasks) ? r.plan : null;
-  return { version: SCHEMA_VERSION, goals, blocks, sleep, home, plan };
+  const declinedDay = typeof r.declinedDay === 'string' ? r.declinedDay : null;
+  const reminders =
+    r.reminders && typeof r.reminders.day === 'string' && Array.isArray(r.reminders.kinds) ? r.reminders : null;
+  return { version: SCHEMA_VERSION, goals, blocks, sleep, home, plan, declinedDay, reminders };
 }
 
 // ---- store ----
@@ -160,8 +168,31 @@ export function todaysPlan(state: PlannerState, now: number): DayPlan | null {
   return state.plan && state.plan.day === dayKey(now) ? state.plan : null;
 }
 
+export function isDeclined(state: PlannerState, now: number): boolean {
+  return state.declinedDay === dayKey(now);
+}
+
+export const NOON_MIN = 12 * 60;
+export const NOON_REMINDER_END_MIN = 14 * 60;
+
+/**
+ * The reminder due at `now`, ignoring what was already sent: 'morning' from wake-up (sleep end)
+ * until noon, 'noon' from 12:00 to 14:00, and none once a plan is set or the day was declined.
+ */
+export function reminderWindow(state: PlannerState, now: number): ReminderKind | null {
+  if ((todaysPlan(state, now)?.tasks.length ?? 0) > 0 || isDeclined(state, now)) return null;
+  const m = minutesOfDay(now);
+  if (m >= parseHHMM(state.sleep.end) && m < NOON_MIN) return 'morning';
+  if (m >= NOON_MIN && m < NOON_REMINDER_END_MIN) return 'noon';
+  return null;
+}
+
+function remindersSentToday(state: PlannerState, now: number): ReminderKind[] {
+  return state.reminders && state.reminders.day === dayKey(now) ? state.reminders.kinds : [];
+}
+
 /** Concrete blocks on the calendar day `dayOffset` days from `now`. */
-function blocksOn(state: PlannerState, now: number, dayOffset: number): Block[] {
+export function blocksOn(state: PlannerState, now: number, dayOffset: number): Block[] {
   const weekday = new Date(localAt(now, 0, dayOffset)).getDay();
   return state.blocks
     .filter((b) => b.days.includes(weekday))
@@ -185,7 +216,14 @@ export function createPlanner(store: PlannerStore, deps: PlannerDeps): Planner {
     },
     sleepWindow: () => ({ ...store.getState().sleep }),
     home: () => (store.getState().home ? { ...store.getState().home! } : null),
-    remindersDue: () => null, // B2
+    remindersDue(t) {
+      const state = store.getState();
+      const kind = reminderWindow(state, t);
+      const sent = remindersSentToday(state, t);
+      if (!kind || sent.includes(kind)) return null;
+      store.update((s) => ({ ...s, reminders: { day: dayKey(t), kinds: [...sent, kind] } }));
+      return kind;
+    },
     openPlanSheet: () => deps.openPlanSheet(),
     onChange: (fn) => store.subscribe(fn),
   };
