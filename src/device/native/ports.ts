@@ -71,6 +71,13 @@ export function createNativeInstalledApps(): InstalledAppsPort {
 // ---- notifications ---------------------------------------------------------------------------
 
 const CHANNEL_ID = 'toll';
+/**
+ * expo-app-blocker's own channel for the notification it posts on every intercept (its id is fixed in
+ * the package's native code). The package creates it as HIGH, which pops a heads-up banner over the
+ * Storm screen each time. Android lets an app LOWER a channel's importance (never raise it) as long as
+ * the user has not changed it, and creating it first on a fresh install fixes it at our level.
+ */
+export const BLOCKER_ALERT_CHANNEL_ID = 'expo_app_blocker_blocked';
 
 export function createNativeNotifier(): Notifier {
   // Show notifications even while the app is open (the default is to stay silent in the foreground).
@@ -82,10 +89,16 @@ export function createNativeNotifier(): Notifier {
       name: 'Toll',
       importance: Notifications.AndroidImportance.DEFAULT, // no sound or heads-up: notification fatigue kills the product
     });
+    void Notifications.setNotificationChannelAsync(BLOCKER_ALERT_CHANNEL_ID, {
+      name: 'Weather checks',
+      importance: Notifications.AndroidImportance.LOW, // in the shade, silent, never a heads-up
+    });
   }
   return {
     async show(n) {
       await Notifications.scheduleNotificationAsync({
+        // Same identifier = the new notice replaces the old one (weather changes don't stack up).
+        ...(n.replaceId ? { identifier: n.replaceId } : {}),
         content: { title: n.title, body: n.body },
         trigger: Platform.OS === 'android' ? { channelId: CHANNEL_ID } : null,
       });

@@ -57,7 +57,11 @@ export function createDeviceKit(ports: DevicePorts, get: GetServices) {
   const notifications: NotificationRouter = createNotificationRouter({
     clock: { now: () => get().clock.now(), onTick: (fn) => get().clock.onTick(fn) },
     posture: { get: () => get().postureSource.get(), subscribe: (fn) => get().postureSource.subscribe(fn) },
-    ledger: { balance: () => get().ledger.balance(), onChange: (fn) => get().ledger.onChange(fn) },
+    ledger: {
+      balance: () => get().ledger.balance(),
+      activeWindows: () => get().ledger.activeWindows(),
+      onChange: (fn) => get().ledger.onChange(fn),
+    },
     planner: { remindersDue: (t) => get().planner.remindersDue(t), nextBlock: (t) => get().planner.nextBlock(t) },
     quests: { onVerified: (fn) => get().quests.onVerified(fn) },
     notifier: ports.notifier,

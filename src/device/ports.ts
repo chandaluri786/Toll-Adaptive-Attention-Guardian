@@ -76,8 +76,11 @@ export type NoticeKind =
   | 'umbrella_low'
   | 'quest_verified';
 
-/** `actions` are the buttons on the notification (the plan reminders offer "Plan" and "Not today"). */
-export type Notice = { kind: NoticeKind; title: string; body: string; at: number; actions?: string[] };
+/**
+ * `actions` are the buttons on the notification (the plan reminders offer "Plan" and "Not today").
+ * `replaceId`: notices with the same id replace each other in the shade instead of stacking.
+ */
+export type Notice = { kind: NoticeKind; title: string; body: string; at: number; actions?: string[]; replaceId?: string };
 
 export interface Notifier {
   show(notice: Notice): void | Promise<void>;

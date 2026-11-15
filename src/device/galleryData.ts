@@ -81,6 +81,7 @@ export function sampleNotices(): Notice[] {
   let now = at(7, 30);
   let state: PostureState = { posture: 'open', score: 0, reason: "Sky's clear. Enjoy it.", reasonCode: 'none', nextChange: null, grace: false, allowanceLeftMin: 120, computedAt: 1 };
   let balance = 30;
+  let windows: AccessWindow[] = [];
   let reminder: 'morning' | 'noon' | null = 'morning';
   let next: Block | null = null;
   const ticks = createEmitter<number>();
@@ -92,7 +93,7 @@ export function sampleNotices(): Notice[] {
   const router = createNotificationRouter({
     clock: { now: () => now, onTick: (fn) => ticks.on(fn) },
     posture: { get: () => state, subscribe: (fn) => posture.on(() => fn(state)) },
-    ledger: { balance: () => balance, onChange: (fn) => ledger.on(() => fn()) },
+    ledger: { balance: () => balance, activeWindows: () => windows, onChange: (fn) => ledger.on(() => fn()) },
     planner: { remindersDue: () => reminder, nextBlock: () => next },
     quests: { onVerified: (fn) => verified.on(({ q, v, m }) => fn(q, v, m)) },
     notifier,
@@ -115,7 +116,8 @@ export function sampleNotices(): Notice[] {
   balance = 43;
   verified.emit({ q: { type: 'fitness' } as Quest, v: { pass: true } as Verdict, m: 25 }); // quest verified
   now = at(13, 5);
-  balance = 4;
+  balance = 28;
+  windows = [{ id: 'u1', scope: 'restricted', until: at(13, 9), source: 'spend' }]; // an umbrella, 4 min left
   ledger.emit(); // umbrella low
   return notifier.log;
 }

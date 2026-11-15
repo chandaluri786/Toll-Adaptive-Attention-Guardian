@@ -1,5 +1,5 @@
 // OWNER: A (task A10). Each notification fires once, for the right trigger, in the design's words.
-import type { Block, PostureState, Quest, Verdict } from '../../contracts';
+import type { AccessWindow, Block, PostureState, Quest, Verdict } from '../../contracts';
 import { HOUR, MIN, createEmitter } from '../../shared/emitter';
 import { createFakeBlocker, createFakeNotifier } from '../fakePorts';
 import { createNotificationRouter, dayKey, fmtClock } from '../notifications';
@@ -14,6 +14,7 @@ function setup(startAt = at(8)) {
   let now = startAt;
   let state: PostureState = { posture: 'open', score: 0, reason: "Sky's clear.", reasonCode: 'none', nextChange: null, grace: false, allowanceLeftMin: 120, computedAt: 1 };
   let balance = 30;
+  let windows: AccessWindow[] = [];
   let reminder: 'morning' | 'noon' | null = null;
   let next: Block | null = null;
   const ticks = createEmitter<number>();
@@ -27,7 +28,7 @@ function setup(startAt = at(8)) {
   const router = createNotificationRouter({
     clock: { now: () => now, onTick: (fn) => ticks.on(fn) },
     posture: { get: () => state, subscribe: (fn) => posture.on(() => fn(state)) },
-    ledger: { balance: () => balance, onChange: (fn) => ledger.on(() => fn()) },
+    ledger: { balance: () => balance, activeWindows: () => windows, onChange: (fn) => ledger.on(() => fn()) },
     planner: { remindersDue: () => reminder, nextBlock: () => next },
     quests: { onVerified: (fn) => verified.on(({ q, v, m }) => fn(q, v, m)) },
     notifier,
@@ -46,6 +47,14 @@ function setup(startAt = at(8)) {
     setPosture: (patch: Partial<PostureState>) => {
       state = { ...state, ...patch };
       posture.emit();
+    },
+    /** Changes the state the engine reports WITHOUT a posture event (allowance ticks down quietly). */
+    patchPosture: (patch: Partial<PostureState>) => {
+      state = { ...state, ...patch };
+    },
+    setWindows: (w: AccessWindow[]) => {
+      windows = w;
+      ledger.emit();
     },
     setBalance: (b: number) => {
       balance = b;
@@ -149,16 +158,49 @@ describe('weather and free time', () => {
 });
 
 describe('umbrella time', () => {
-  it('warns once when it drops under 5 minutes, and re-arms after it recovers', () => {
-    const t = setup();
-    t.setBalance(8);
-    expect(t.kinds()).toEqual([]);
-    t.setBalance(4);
-    t.setBalance(3);
+  const umbrella = (until: number, id = 'w1'): AccessWindow => ({ id, scope: 'restricted', until, source: 'spend' });
+
+  it('warns once when an open umbrella has under 5 minutes left', () => {
+    // Arrange
+    const t = setup(at(9));
+    t.setWindows([umbrella(at(9, 15))]);
+
+    // Act
+    t.setNow(at(9, 8));
+    t.tick();
+    t.setNow(at(9, 11));
+    t.tick();
+    t.setNow(at(9, 12));
+    t.tick();
+
+    // Assert
     expect(t.kinds()).toEqual(['umbrella_low']);
     expect(t.notifier.log[0]).toMatchObject({ title: 'Umbrella under 5 min', body: '4 minutes left on this one. Fold it whenever you like.' });
-    t.setBalance(25); // a quest paid out
-    t.setBalance(2);
+  });
+
+  it('stays quiet when the banked balance is low but no umbrella is open', () => {
+    // Arrange
+    const t = setup();
+
+    // Act
+    t.setBalance(0);
+    t.setBalance(3);
+    t.tick();
+
+    // Assert
+    expect(t.kinds()).toEqual([]);
+  });
+
+  it('ignores quest and emergency windows, and warns again for the next umbrella', () => {
+    // Arrange
+    const t = setup(at(9, 12));
+
+    // Act
+    t.setWindows([{ ...umbrella(at(9, 15)), source: 'emergency' }]);
+    t.setWindows([umbrella(at(9, 15), 'w1')]);
+    t.setWindows([umbrella(at(9, 16), 'w2')]);
+
+    // Assert
     expect(t.kinds()).toEqual(['umbrella_low', 'umbrella_low']);
   });
 
@@ -168,6 +210,34 @@ describe('umbrella time', () => {
     t.setPosture({ posture: 'metered', allowanceLeftMin: 0, nextChange: { at: at(14), to: 'open' } });
     t.setBalance(12);
     expect(t.blocker.notification()).toEqual({ title: 'Cloudy · umbrella 12 min', text: 'Clears at 14:00. Free time is used up for today.' });
+  });
+});
+
+describe('persistent notification', () => {
+  it('refreshes from current state on each clock tick, not only on events', () => {
+    // Arrange
+    const t = setup();
+    t.patchPosture({ allowanceLeftMin: 0 }); // the engine moved on without a posture event
+
+    // Act
+    t.tick();
+
+    // Assert
+    expect(t.blocker.notification().text).toBe('Free time is used up for today.');
+  });
+});
+
+describe('weather notices', () => {
+  it('replace each other instead of stacking', () => {
+    // Arrange
+    const t = setup();
+
+    // Act
+    t.setPosture({ posture: 'metered' });
+    t.setPosture({ posture: 'sealed' });
+
+    // Assert
+    expect(t.notifier.log.map((n) => n.replaceId)).toEqual(['weather', 'weather']);
   });
 });
 

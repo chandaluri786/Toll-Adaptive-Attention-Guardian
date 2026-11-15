@@ -13,6 +13,8 @@ import type { BlockerPort, Notice, NoticeKind, Notifier } from './ports';
 import { type KeyValueStore, KEY_PREFIX } from './storage';
 
 export const UMBRELLA_LOW_MIN = 5;
+/** Weather notices share one id, so each new one replaces the last instead of stacking in the shade. */
+export const WEATHER_NOTICE_ID = 'weather';
 export const BLOCK_WARNING_MS = 10 * MIN;
 /** The day (and its reminders) resets at 04:00, matching the ledger. */
 export const DAY_RESET_HOUR = 4;
@@ -51,7 +53,7 @@ export function persistentBody(s: Pick<PostureState, 'allowanceLeftMin' | 'nextC
 export type NotificationDeps = {
   clock: Pick<Clock, 'now' | 'onTick'>;
   posture: Pick<PostureSource, 'get' | 'subscribe'>;
-  ledger: Pick<Ledger, 'balance' | 'onChange'>;
+  ledger: Pick<Ledger, 'balance' | 'activeWindows' | 'onChange'>;
   planner: Pick<Planner, 'remindersDue' | 'nextBlock'>;
   quests: Pick<Quests, 'onVerified'>;
   notifier: Notifier;
@@ -63,10 +65,9 @@ export type NotificationDeps = {
 export function createNotificationRouter(d: NotificationDeps) {
   let lastPosture: Posture | null = null;
   let lastAllowance: number | null = null;
-  let umbrellaWasLow = false;
 
-  const send = (kind: NoticeKind, title: string, body: string, actions?: string[]) =>
-    void d.notifier.show({ kind, title, body, at: d.clock.now(), ...(actions ? { actions } : {}) } satisfies Notice);
+  const send = (kind: NoticeKind, title: string, body: string, extra: Pick<Notice, 'actions' | 'replaceId'> = {}) =>
+    void d.notifier.show({ kind, title, body, at: d.clock.now(), ...extra } satisfies Notice);
 
   /** True the first time this (kind, key) is seen on this day; remembers it across restarts. */
   const firstTime = (kind: NoticeKind, key: string): boolean => {
@@ -89,10 +90,10 @@ export function createNotificationRouter(d: NotificationDeps) {
     // Plan reminders: morning, then noon only if nothing is planned (Planner decides which is due).
     const due = d.planner.remindersDue(now);
     if (due === 'morning' && firstTime('plan_morning', today)) {
-      send('plan_morning', 'Plan your day?', 'Two minutes now, smarter help later.', ['Plan', 'Not today']);
+      send('plan_morning', 'Plan your day?', 'Two minutes now, smarter help later.', { actions: ['Plan', 'Not today'] });
     }
     if (due === 'noon' && firstTime('plan_noon', today)) {
-      send('plan_noon', 'Nothing planned yet — want to?', 'No pressure. The sky works either way.', ['Plan', 'Not today']);
+      send('plan_noon', 'Nothing planned yet — want to?', 'No pressure. The sky works either way.', { actions: ['Plan', 'Not today'] });
     }
 
     // 10 minutes before a declared block begins.
@@ -102,12 +103,15 @@ export function createNotificationRouter(d: NotificationDeps) {
       const weather = next.type === 'wind_down' ? 'Cloudy' : 'Storm';
       send('block_soon', `Clouds at ${fmtClock(next.start)} — ${next.title}`, `${weather} until ${fmtClock(next.end)}. Umbrella time stays put for later.`);
     }
+
+    checkUmbrella();
+    refreshPersistent(); // free time and the next change move between posture events
   };
 
   const onPosture = () => {
     const s = d.posture.get();
 
-    if (lastPosture !== null && s.posture !== lastPosture) send('weather_change', `${WEATHER_NAME[s.posture]} now`, s.reason);
+    if (lastPosture !== null && s.posture !== lastPosture) send('weather_change', `${WEATHER_NAME[s.posture]} now`, s.reason, { replaceId: WEATHER_NOTICE_ID });
     lastPosture = s.posture;
 
     // Free time used: fires when the allowance first hits 0 (not at start-up with 0 already).
@@ -119,13 +123,19 @@ export function createNotificationRouter(d: NotificationDeps) {
     refreshPersistent();
   };
 
+  /** An open umbrella (a window paid for with umbrella time) running out: warn once per umbrella. */
+  const checkUmbrella = () => {
+    const now = d.clock.now();
+    const open = d.ledger.activeWindows().filter((w) => w.source === 'spend' && w.until > now);
+    if (open.length === 0) return;
+    const umbrella = open.reduce((a, b) => (b.until > a.until ? b : a));
+    const left = Math.ceil((umbrella.until - now) / MIN);
+    if (left >= UMBRELLA_LOW_MIN || !firstTime('umbrella_low', umbrella.id)) return;
+    send('umbrella_low', 'Umbrella under 5 min', `${left} ${left === 1 ? 'minute' : 'minutes'} left on this one. Fold it whenever you like.`);
+  };
+
   const onLedger = () => {
-    const low = d.ledger.balance() < UMBRELLA_LOW_MIN;
-    if (low && !umbrellaWasLow) {
-      const m = d.ledger.balance();
-      send('umbrella_low', 'Umbrella under 5 min', `${m} ${m === 1 ? 'minute' : 'minutes'} left on this one. Fold it whenever you like.`);
-    }
-    umbrellaWasLow = low; // re-arms once the balance recovers
+    checkUmbrella();
     refreshPersistent();
   };
 
@@ -136,7 +146,6 @@ export function createNotificationRouter(d: NotificationDeps) {
       const s = d.posture.get();
       lastPosture = s.posture;
       lastAllowance = s.allowanceLeftMin;
-      umbrellaWasLow = d.ledger.balance() < UMBRELLA_LOW_MIN;
       refreshPersistent();
 
       const subs = [
