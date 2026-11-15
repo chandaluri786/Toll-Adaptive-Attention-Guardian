@@ -1,0 +1,18 @@
+# OWNER: B (Spec B — task B10, P1). Skeleton: fill in the handler, then `sam build && sam deploy --guided`.
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Toll quiz generation — topics in, questions out, nothing stored.
+
+Resources:
+  QuizApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: index.handler
+      CodeUri: src/
+      Timeout: 30
+      Policies:
+        - Statement:
+            - { Effect: Allow, Action: bedrock:InvokeModel, Resource: '*' }
+      Events:
+        Generate: { Type: HttpApi, Properties: { Path: /quiz, Method: post } }

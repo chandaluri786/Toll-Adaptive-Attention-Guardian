@@ -1,0 +1,27 @@
+# Toll — who reviews what. Replace each placeholder with the person's GitHub handle (e.g. @name)
+# and uncomment the line. Until then this file only documents ownership.
+# See README.md "Who owns what" and docs/specs/.
+
+# Shared, frozen at hour 1:30: changes need all three people
+# /src/contracts.ts          PERSON_A PERSON_B PERSON_C
+# /src/services.ts           PERSON_A PERSON_B PERSON_C
+# /src/shared/               PERSON_A PERSON_B PERSON_C
+# /src/app/                  PERSON_A PERSON_B PERSON_C
+# /docs/contract.md          PERSON_A PERSON_B PERSON_C
+
+# Spec A — Device
+# /src/device/               PERSON_A
+# /src/ui/                   PERSON_A
+# /docs/specs/A-device.md    PERSON_A
+
+# Spec B — Day & quests
+# /src/day/                  PERSON_B
+# /cloud/quiz/               PERSON_B
+# /docs/specs/B-day-quests.md PERSON_B
+
+# Spec C — Engine, money, cloud
+# /src/engine/               PERSON_C
+# /src/ledger/               PERSON_C
+# /cloud/ledger/             PERSON_C
+# /extension/                PERSON_C
+# /docs/specs/C-engine-cloud.md PERSON_C

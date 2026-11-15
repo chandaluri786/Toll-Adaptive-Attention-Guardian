@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Toll",
+  "version": "0.1.0",
+  "description": "Your umbrella time, on the laptop too.",
+  "action": { "default_popup": "popup.html", "default_title": "Toll" },
+  "permissions": ["storage", "declarativeNetRequest"],
+  "host_permissions": ["<all_urls>"]
+}

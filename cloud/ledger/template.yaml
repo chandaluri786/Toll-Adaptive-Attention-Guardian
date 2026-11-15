@@ -1,0 +1,35 @@
+# OWNER: C (Spec C — tasks C8, C9). Skeleton: fill in the handler, then `sam build && sam deploy --guided`.
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Toll ledger — wallet IDs and minute deltas, nothing else.
+
+Resources:
+  LedgerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: walletId, AttributeType: S }
+        - { AttributeName: eventId, AttributeType: S }
+      KeySchema:
+        - { AttributeName: walletId, KeyType: HASH }
+        - { AttributeName: eventId, KeyType: RANGE } # idempotent writes
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true } # used by pairing codes
+
+  LedgerApi:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs22.x
+      Handler: index.handler
+      CodeUri: src/
+      Environment: { Variables: { TABLE: !Ref LedgerTable } }
+      Policies: [{ DynamoDBCrudPolicy: { TableName: !Ref LedgerTable } }]
+      Events:
+        PostEvents: { Type: HttpApi, Properties: { Path: /events, Method: post } }
+        GetBalance: { Type: HttpApi, Properties: { Path: /balance, Method: get } }
+        Pair: { Type: HttpApi, Properties: { Path: /pair, Method: post } }
+        Claim: { Type: HttpApi, Properties: { Path: /pair/claim, Method: post } }
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
