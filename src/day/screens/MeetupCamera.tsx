@@ -4,7 +4,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Button, useTheme } from '../../ui/components';
+import { Button, useSky, useTheme } from '../../ui/components';
 import { radius, space, touch, type as font } from '../../ui/theme';
 import { formatCode } from '../components/MeetupCodeCard';
 import type { MeetupCode } from '../wordlist';
@@ -16,8 +16,7 @@ const CORNER = 26;
 const SHUTTER = 64;
 
 function FrameGuide() {
-  const t = useTheme();
-  const c = t.storm.ink;
+  const c = useSky('sealed').on;
   const edge = (pos: object, sides: object) => <View style={[{ position: 'absolute', width: CORNER, height: CORNER, borderColor: c }, pos, sides]} />;
   return (
     <View style={{ width: '80%', aspectRatio: 1.6, alignSelf: 'center' }}>
@@ -51,6 +50,7 @@ function PermissionAsk({ onAllow }: { onAllow: () => void }) {
 
 export function MeetupCamera({ code, busy, notice, onShot, onRetake }: Props) {
   const t = useTheme();
+  const storm = useSky('sealed');
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [ready, setReady] = useState(false);
@@ -71,11 +71,11 @@ export function MeetupCamera({ code, busy, notice, onShot, onRetake }: Props) {
   return (
     <View style={{ gap: space.m }}>
       <Header code={code} />
-      <View style={{ height: 420, borderRadius: radius.l, overflow: 'hidden', backgroundColor: t.storm.sky }}>
+      <View style={{ height: 420, borderRadius: radius.l, overflow: 'hidden', backgroundColor: storm.top }}>
         <CameraView ref={camera} style={{ flex: 1 }} facing="back" onCameraReady={() => setReady(true)} />
         <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', gap: space.m }}>
           <FrameGuide />
-          <Text style={{ color: t.storm.ink, fontSize: font.small, textAlign: 'center' }}>Fit the paper inside the frame</Text>
+          <Text style={{ color: storm.on, fontSize: font.small, textAlign: 'center' }}>Fit the paper inside the frame</Text>
         </View>
         {!!notice && (
           <View accessibilityLiveRegion="polite" style={{ position: 'absolute', top: space.m, left: space.m, right: space.m, backgroundColor: t.surface, borderRadius: radius.m, padding: space.m }}>
