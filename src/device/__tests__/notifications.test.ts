@@ -94,7 +94,7 @@ describe('plan reminders', () => {
     expect(dayKey(at(0, 30))).toBe(dayKey(at(3, 30)));
   });
 
-  it('dayKey is the LOCAL date, whatever the phone's time zone', () => {
+  it('dayKey is the LOCAL date, whatever the time zone', () => {
     expect(dayKey(at(12))).toBe('2026-11-16');
     expect(dayKey(at(3, 59))).toBe('2026-11-15');
   });
