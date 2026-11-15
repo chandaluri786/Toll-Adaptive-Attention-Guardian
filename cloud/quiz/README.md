@@ -28,10 +28,9 @@ Live: `https://jh1zokqxt1.execute-api.us-east-2.amazonaws.com` (also `QUIZ_API_U
 Model: parameter `ModelId`, default `us.anthropic.claude-sonnet-4-6` (US cross-region inference profile).
 `anthropic.claude-sonnet-5-5` is listed in us-east-2 but returns `AccessDeniedException … is not available for this account`.
 
-**Status 2026-11-15:** deployed, but every Anthropic model now answers `ResourceNotFoundException: Model use case details
-have not been submitted for this account` — the account owner must submit the Anthropic use-case form in the Bedrock
-console (us-east-2 → Model access). Until then `POST /quiz` returns 502 and the app falls back to focus. No redeploy is
-needed afterwards; smoke test:
+**Status 2026-11-15:** live. Bedrock access opened after the account's Anthropic use-case form was submitted (the IAM
+user also needed `aws-marketplace:ViewSubscriptions`/`Subscribe`). Smoke test: 2 topics → 9 + 9 questions in 6.4 s; 7 topics
+→ 200 in 7.2 s. Rerun:
 ```
 curl -s -X POST https://jh1zokqxt1.execute-api.us-east-2.amazonaws.com/quiz -H 'content-type: application/json' -d '{"topics":["Graph algorithms"]}'
 ```
