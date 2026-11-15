@@ -77,6 +77,7 @@ export default function TodayScreen() {
     tasks: plannerState ? (todaysPlan(plannerState, now)?.tasks ?? []) : null,
     liveByTask: liveByTask(),
     suggestion: engine ? engine.suggest(now) : FAKE_SUGGESTION,
+    ...(engine ? { quizReady: engine.quizReady } : {}),
   });
 
   const openSheet = (offer?: { type: Offer['type']; taskId?: string }) => sheetRequests.emit({ from: 'today', posture: state.posture, ...(offer ? { offer } : {}) });

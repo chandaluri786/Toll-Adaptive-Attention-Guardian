@@ -68,11 +68,22 @@ export type RuleContext = {
   activeTypes: TaskType[];
   lastPassed: Partial<Record<TaskType, number>>;
   hasHome: boolean;
+  /** B10: a quiz is ready for this plan task (no id: for any of today's study tasks). */
+  quizReady?: (taskId?: string) => boolean;
 };
+
+export const QUIZ_NOT_READY = "Quiz questions aren't ready — try phone-down focus";
+
+/** Quest types that verify a plan task: study takes the quiz once its questions are in, else focus. */
+export function questTypesForTask(task: { id: string; type: TaskType }, ctx: Pick<RuleContext, 'quizReady'>): TaskType[] {
+  const base = questTypeFor(task.type);
+  const quiz: TaskType[] = task.type === 'study' && ctx.quizReady?.(task.id) ? ['study'] : [];
+  return base ? [...quiz, base] : quiz;
+}
 
 /** Why a quest of this type can't start right now (friendly copy), or null if it can. */
 export function blockedReason(type: TaskType, ctx: RuleContext): string | null {
-  if (questTypeFor(type) !== type) return `${TASK_LABELS[type]} quests aren't ready yet`;
+  if (type === 'study' ? !ctx.quizReady?.() : questTypeFor(type) !== type) return type === 'study' ? QUIZ_NOT_READY : `${TASK_LABELS[type]} quests aren't ready yet`;
   if (ctx.activeTypes.includes(type)) return `You already have a ${TASK_LABELS[type].toLowerCase()} quest going`;
   if (type === 'fitness' && ctx.stepsToday >= DAILY_STEP_TARGET) return "You've hit 7,000 steps today — rest those legs";
   const last = ctx.lastPassed[type];
@@ -103,7 +114,7 @@ export function suggestQuest(state: PlannerState, ctx: RuleContext): Offer | nul
   if (minutesLeft === null) return null;
   const fromPlan = (todaysPlan(state, ctx.now)?.tasks ?? [])
     .filter((t) => t.done < 1)
-    .map((t) => ({ type: questTypeFor(t.type), taskId: t.id as string | undefined, title: t.title }));
+    .map((t) => ({ type: questTypesForTask(t, ctx)[0] ?? null, taskId: t.id as string | undefined, title: t.title }));
   const fromGoals = state.goals.map((g) => ({ type: questTypeFor(g.type), taskId: undefined, title: '' }));
   for (const c of [...fromPlan, ...fromGoals]) {
     if (!c.type || blockedReason(c.type, ctx) || !fitsTimeOfDay(c.type, minutesLeft)) continue;

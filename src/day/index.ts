@@ -4,6 +4,8 @@ import type { GetServices } from '../contracts';
 import { createFakeDay } from './fakes';
 import { createMemoryKV } from './kv';
 import { createPlannerStore, type PlannerStore } from './planner';
+import type { QuizFetch } from './quiz-client';
+import { QUIZ_API_URL } from './quizConfig';
 import type { QuestEngine } from './quests';
 import { createRealDay as createRealDayWith, type RealDayDeps } from './real';
 
@@ -26,6 +28,7 @@ const nativeDeps: RealDayDeps = {
   store: () => (require('./store') as typeof import('./store')).getPlannerStore(),
   kv: () => (require('./store') as typeof import('./store')).getDayKV(),
   steps: () => (require('./pedometer') as typeof import('./pedometer')).createPermittedStepSource(),
+  ...(QUIZ_API_URL ? { quiz: { baseUrl: QUIZ_API_URL, fetch: ((url, init) => fetch(url, init as RequestInit)) as QuizFetch } } : {}),
 };
 
 /** jest can't load MMKV (nitro ships ESM): app-level tests get memory storage and a silent pedometer. */

@@ -150,6 +150,20 @@ describe("today's tasks", () => {
     if (v.tasks.kind !== 'plan') throw new Error('expected a plan');
     expect(v.tasks.rows[0].status).toEqual({ kind: 'verify', questType: 'focus' });
   });
+
+  test('B10: a study task with its quiz ready is verified by the quiz and pays study rates', () => {
+    // Arrange
+    const tasks = [task('s', { type: 'study', title: 'Graphs', topic: 'BFS' }), task('t', { type: 'study', title: 'DP', topic: 'DP' })];
+    // Act
+    const v = todayView(input({ tasks, quizReady: (id) => id === 's' }));
+    // Assert
+    if (v.tasks.kind !== 'plan') throw new Error('expected a plan');
+    expect(v.tasks.rows.map((r) => r.status)).toEqual([
+      { kind: 'verify', questType: 'study' },
+      { kind: 'verify', questType: 'focus' },
+    ]);
+    expect(v.tasks.rows[0].meta).toBe('Study · pays 20 min');
+  });
 });
 
 describe('suggested quest', () => {

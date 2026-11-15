@@ -7,7 +7,7 @@ import { weatherFor } from '../ui/weather';
 import { clockTime, formatHoursMin, formatMinSec } from './format';
 import type { PlanTask } from './planner';
 import { payFor, QUEST_COPY } from './quest-copy';
-import { questTypeFor } from './quest-rules';
+import { questTypesForTask } from './quest-rules';
 import { readout, UMBRELLA_BAR_MIN } from './quest-sheet';
 import type { LiveReadout, Offer } from './quests';
 import { TASK_LABELS } from './plan';
@@ -31,6 +31,8 @@ export type TodayInput = {
   /** Live readout of a running quest per plan task. */
   liveByTask: Record<string, { type: TaskType; live: LiveReadout; target: number }>;
   suggestion: Offer | null;
+  /** B10: a quiz is ready for this study task (else it verifies by focus). */
+  quizReady?: (taskId?: string) => boolean;
 };
 
 export type TaskStatus =
@@ -79,14 +81,16 @@ export function freeTimeMeter(allowanceLeftMin: number): TodayView['free'] {
   return { headline, fraction: clamp01(left / FREE_MIN_PER_DAY), resets: 'Resets 04:00' };
 }
 
-function taskStatus(task: PlanTask, live: TodayInput['liveByTask'][string] | undefined): TaskStatus {
+/** The quest that verifies a task here: study takes the quiz once its questions are in. */
+const taskQuestType = (task: PlanTask, input: TodayInput) => questTypesForTask(task, { quizReady: input.quizReady })[0] ?? null;
+
+function taskStatus(task: PlanTask, live: TodayInput['liveByTask'][string] | undefined, questType: TaskType | null): TaskStatus {
   if (task.done >= 1) return { kind: 'done', label: 'Done' };
   if (task.done > 0) return { kind: 'done', label: 'Half done' };
   if (live) {
     const r = readout(live.type, live.live, live.target);
     return { kind: 'live', label: `${r.big} ${r.sub}` };
   }
-  const questType = questTypeFor(task.type);
   return questType ? { kind: 'verify', questType } : { kind: 'later', label: 'Checks arrive soon' };
 }
 
@@ -97,8 +101,8 @@ function taskRows(input: TodayInput): TodayView['tasks'] {
     id: t.id,
     type: t.type,
     title: t.title,
-    meta: `${TASK_LABELS[t.type]} · pays ${payFor(questTypeFor(t.type) ?? t.type, t.rate)} min`,
-    status: taskStatus(t, input.liveByTask[t.id]),
+    meta: `${TASK_LABELS[t.type]} · pays ${payFor(taskQuestType(t, input) ?? t.type, t.rate)} min`,
+    status: taskStatus(t, input.liveByTask[t.id], taskQuestType(t, input)),
   }));
   return { kind: 'plan', count: `${done} of ${total} done`, rows };
 }

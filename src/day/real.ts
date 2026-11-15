@@ -9,6 +9,8 @@ import type { KV } from './kv';
 import { createPlanActions, type PlanActions } from './plan';
 import { createPlanner, defaultState, todaysPlan, type PlannerStore } from './planner';
 import { questTypeFor } from './quest-rules';
+import { createQuizBank, type QuizBank } from './quiz-bank';
+import { requestQuizPools, type QuizRequestDeps } from './quiz-client';
 import { createQuestEngine, type QuestEngine, type StepSource } from './quests';
 import { demoState, noPlanState } from './seeds';
 
@@ -17,9 +19,11 @@ export type RealDayDeps = {
   store: () => PlannerStore;
   kv: () => KV;
   steps: () => StepSource;
+  /** B10: the quiz Lambda. Missing = no quizzes; study tasks verify by focus. */
+  quiz?: Pick<QuizRequestDeps, 'baseUrl' | 'fetch'>;
 };
 
-type Core = { store: PlannerStore; planActions: PlanActions; planner: Planner; engine: QuestEngine };
+type Core = { store: PlannerStore; planActions: PlanActions; planner: Planner; engine: QuestEngine; quiz: QuizBank };
 export type RealDayDebug = QuestsDebug & { accept(type?: TaskType): Quest; setPlan(on: boolean): void };
 
 /** DeviceSignals that resolve A's service at call time. */
@@ -39,11 +43,16 @@ export function createRealDay(get: GetServices, deps: RealDayDeps) {
 
   const build = (): Core => {
     const store = deps.store();
+    const kv = deps.kv();
+    const api = deps.quiz;
+    const quiz = createQuizBank({ kv, now, planner: store, request: api ? (topics) => requestQuizPools(topics, api) : null });
+    // One request with the day's study topics once it's planned; a later study task asks for its own.
+    store.subscribe(() => void quiz.sync());
     const planActions = createPlanActions(store, { now });
     const planner = createPlanner(store, { now, openPlanSheet: () => planSheetRequests.emit() });
     const engine = createQuestEngine({
       now,
-      kv: deps.kv(),
+      kv,
       ledger: { credit: (c) => get().ledger.credit(c) },
       deviceSignals: lateSignals(get),
       planner: store,
@@ -51,8 +60,9 @@ export function createRealDay(get: GetServices, deps: RealDayDeps) {
       steps: deps.steps(),
       onTick: (fn) => get().clock.onTick(fn),
       sheetRequests,
+      quiz,
     });
-    return { store, planActions, planner, engine };
+    return { store, planActions, planner, engine, quiz };
   };
 
   /** Build on first use; start the engine (step + tick subscriptions) once services is filled. */
@@ -61,6 +71,9 @@ export function createRealDay(get: GetServices, deps: RealDayDeps) {
     if (!started && get().clock) {
       started = true;
       core.engine.start();
+      const { quiz } = core;
+      void quiz.sync();
+      get().clock.onTick(() => void quiz.sync()); // offline at planning time → retried later (throttled)
     }
     return core;
   };

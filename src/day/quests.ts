@@ -9,7 +9,8 @@ import { readJson, type KV } from './kv';
 import type { PlanActions } from './plan';
 import { todaysPlan, type PlannerStore } from './planner';
 import { evaluate, evaluateMeetupPhoto, liveReadout, passRate, type EvalContext, type LiveReadout } from './quest-evaluate';
-import { blockedReason, CLAIM_HALF_RATE, METHOD_FOR, QUEST_TARGETS, QUEST_TTL_MS, questTypeFor, RETRY_AFTER_MS, suggestQuest, type Offer, type RuleContext } from './quest-rules';
+import { createQuizActions, type QuizActions, type QuizPort } from './quest-quiz';
+import { blockedReason, CLAIM_HALF_RATE, METHOD_FOR, QUEST_TARGETS, QUEST_TTL_MS, questTypeFor, questTypesForTask, RETRY_AFTER_MS, suggestQuest, type Offer, type RuleContext } from './quest-rules';
 import { emptyState, loadEngineState, MAX_SAMPLES, MAX_SCREEN_EVENTS, pruneRecords, STORAGE_KEY, type EngineState, type QuestRecord, type ScreenEvent } from './quest-state';
 import { dayKey } from './time';
 import { countMeetupWords } from './verifiers';
@@ -32,6 +33,8 @@ export type QuestEngineDeps = {
   onTick?: (fn: (now: number) => void) => Unsub;
   meetupCode?: () => MeetupCode;
   sheetRequests?: Emitter<SheetRequest>;
+  /** B10: study quests take a quiz when its questions are in; without it they verify by focus. */
+  quiz?: QuizPort;
 };
 
 export type AcceptResult = { ok: true; quest: Quest } | { ok: false; error: string };
@@ -49,7 +52,7 @@ export type QuestProgress = {
   live: LiveReadout;
 };
 
-export type QuestEngine = Quests & {
+export type QuestEngine = Quests & QuizActions & {
   start(): void;
   stop(): void;
   subscribe(fn: () => void): Unsub;
@@ -104,6 +107,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     activeTypes: liveRecords().map((r) => r.quest.type),
     lastPassed: state.lastPassed,
     hasHome: deps.planner.getState().home !== null,
+    quizReady: (taskId) => deps.quiz?.ready(taskId) ?? false,
   });
   const taskRate = (q: Quest) => todaysPlan(deps.planner.getState(), deps.now())?.tasks.find((t) => t.id === q.taskId)?.rate ?? 1;
 
@@ -227,7 +231,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
       const task = todaysPlan(deps.planner.getState(), deps.now())?.tasks.find((t) => t.id === taskId);
       if (!task) return { ok: false, error: "That task is not in today's plan" };
       if (task.done >= 1) return { ok: false, error: 'That task is already done' };
-      if (questTypeFor(task.type) !== type) return { ok: false, error: "That quest doesn't match the task" };
+      if (!questTypesForTask(task, ruleCtx()).includes(type)) return { ok: false, error: "That quest doesn't match the task" };
     }
     const blocked = blockedReason(type, ruleCtx());
     if (blocked) return { ok: false, error: blocked };
@@ -263,6 +267,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     if (r.retryAt !== null && deps.now() < r.retryAt && r.lastVerdict) return { kind: 'wait', verdict: r.lastVerdict, retryAt: r.retryAt };
     const v = evaluate(r, evalCtx());
     if (r.quest.type === 'meetup') return { kind: 'missed', verdict: v, retryAt: null }; // passes only via a photo
+    if (r.quest.type === 'study') return unavailable('Answer the quiz to verify'); // passes only via answerQuiz
     if (v.pass) return finishPass(r, v, passRate(taskRate(r.quest), v));
     return recordMiss(r, v, true);
   }
@@ -323,6 +328,8 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     expireDue();
     liveRecords().filter((r) => r.quest.type === 'focus').forEach(autoCheck);
   }
+
+  const quizActions = createQuizActions({ quiz: deps.quiz, now: deps.now, live: liveOrError, pass: (r, v) => finishPass(r, v, passRate(taskRate(r.quest), v)), miss: (r, v) => recordMiss(r, v, true) });
 
   // ---- debug (demo panel) ----
 
@@ -389,6 +396,7 @@ export function createQuestEngine(deps: QuestEngineDeps): QuestEngine {
     submitMeetupPhoto,
     claimHalf,
     abandon,
+    ...quizActions,
     stepsToday,
     tick,
     debug,
