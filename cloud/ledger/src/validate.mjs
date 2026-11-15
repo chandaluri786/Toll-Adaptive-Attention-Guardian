@@ -55,3 +55,36 @@ export const parseEventBatch = (rawBody) => {
     events: events.map(({ id, walletId, deltaMinutes, at }) => ({ id, walletId, deltaMinutes, at })),
   };
 };
+
+// Pairing bodies: exactly { walletId } for /pair and exactly { code } for /pair/claim.
+export const MAX_PAIR_BODY_BYTES = 1024;
+const CODE_PATTERN = /^\d{6}$/;
+
+const parseSingleField = (rawBody, field) => {
+  const shape = `body must be JSON: { "${field}": ... }`;
+  if (typeof rawBody !== 'string' || rawBody.length === 0) return fail(shape);
+  if (Buffer.byteLength(rawBody, 'utf8') > MAX_PAIR_BODY_BYTES) return fail(`body must be at most ${MAX_PAIR_BODY_BYTES} bytes`);
+  let parsed;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return fail(shape);
+  }
+  if (!isObject(parsed)) return fail(shape);
+  const extra = Object.keys(parsed).filter((key) => key !== field);
+  if (extra.length > 0) return fail(`body has fields pairing does not accept: ${extra.join(', ')}`);
+  return { ok: true, value: parsed[field] };
+};
+
+export const parsePairRequest = (rawBody) => {
+  const body = parseSingleField(rawBody, 'walletId');
+  return body.ok ? parseWalletId(body.value) : body;
+};
+
+export const parseClaimRequest = (rawBody) => {
+  const body = parseSingleField(rawBody, 'code');
+  if (!body.ok) return body;
+  return typeof body.value === 'string' && CODE_PATTERN.test(body.value)
+    ? { ok: true, code: body.value }
+    : fail('code must be six digits');
+};

@@ -11,18 +11,21 @@
   phone must strip events to these four fields before syncing.
 - `GET /balance?walletId=<uuid>` → `200 { "walletId", "balanceMinutes" }` = sum of all deltas (0 for an unknown wallet).
   The phone's ledger closes each day with a `reset` event, so this sum equals the phone's balance once it has synced.
-- `POST /pair`, `POST /pair/claim` → `501` until C9.
+- `POST /pair` — body exactly `{ "walletId": "<uuid>" }` → `200 { "code": "123456", "expiresAt": <epoch seconds> }`.
+  A random 6-digit code valid **5 minutes**, stored with `attribute_not_exists(code)` and retried (up to 5 times) on a clash.
+- `POST /pair/claim` — body exactly `{ "code": "123456" }` → `200 { "walletId" }` and the code is deleted (works **once**).
+  Unknown, already used and expired codes all get the same **`404 { "error" }`** (expiry is checked against `expiresAt`, since
+  TTL deletion lags; the take is one atomic DeleteItem, so two claims can't both win). Malformed body (not six digits, extra
+  fields, > 1 KB) → `400`. Guessing is bounded by the stage throttle (10 rps): ~3000 tries per 5-minute code in a million.
 
 ## Tables
 - `LedgerTable`: `walletId` (HASH) + `eventId` (RANGE), plus `deltaMinutes` and `at`. Nothing else.
-- `PairTable` (for C9): `code` (HASH), with TTL on `expiresAt` (epoch **seconds**). Suggested row: `{ code, walletId, expiresAt }`.
-  Write it with `attribute_not_exists(code)` (retry on a clash), and on claim check `expiresAt > now` yourself, because TTL
-  deletion can lag. Delete the row on claim, so a code works once. Env var `PAIR_TABLE`, and the function already has CRUD on it.
+- `PairTable`: `code` (HASH), `walletId`, `expiresAt` (epoch **seconds**, TTL). Nothing else. Env var `PAIR_TABLE`.
 
 ## Code
-`src/validate.mjs` (boundary checks), `src/ledger.mjs` (logic over an injected store), `src/http.mjs` (routing, 400/404/500/501),
-`src/dynamo.mjs` (DynamoDB store; the AWS SDK v3 ships with the nodejs22.x runtime, so the function has no dependencies),
-`src/index.mjs` (Lambda entry). Tests use an in-memory store: `cd cloud/ledger && npm test` (Node's test runner, no install).
+`src/validate.mjs` (boundary checks), `src/ledger.mjs` (logic over an injected store), `src/pairing.mjs` (pair/claim over an
+injected pair store and clock), `src/http.mjs` (routing, 400/404/500), `src/dynamo.mjs` + `src/pairStore.mjs` (DynamoDB stores; the AWS SDK v3 ships with the nodejs22.x runtime, so the function has no dependencies),
+`src/index.mjs` (Lambda entry). Tests use in-memory stores: `cd cloud/ledger && npm test` (Node's test runner, no install).
 
 ## Deploy (free tier: on-demand DynamoDB, HTTP API throttled to 10 rps / burst 20, 128 MB arm64 Lambda, 7-day logs)
 ```

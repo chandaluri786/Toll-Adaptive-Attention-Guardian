@@ -1,6 +1,7 @@
-// HTTP API (payload v2) routing. Pure apart from the injected store and log.
-import { parseEventBatch, parseWalletId } from './validate.mjs';
+// HTTP API (payload v2) routing. Pure apart from the injected stores, clock and log.
+import { parseClaimRequest, parseEventBatch, parsePairRequest, parseWalletId } from './validate.mjs';
 import { createLedgerService } from './ledger.mjs';
+import { createPairingService } from './pairing.mjs';
 
 const respond = (statusCode, payload) => ({
   statusCode,
@@ -13,8 +14,9 @@ const bodyOf = (event) =>
     ? Buffer.from(event.body, 'base64').toString('utf8')
     : event.body;
 
-export const createRouter = ({ store, log = console }) => {
+export const createRouter = ({ store, pairStore, now = () => Date.now(), log = console }) => {
   const ledger = createLedgerService(store);
+  const pairing = createPairingService({ store: pairStore, now });
 
   const routes = {
     'POST /events': async (event) => {
@@ -27,9 +29,19 @@ export const createRouter = ({ store, log = console }) => {
       if (!wallet.ok) return respond(400, { error: wallet.error });
       return respond(200, { walletId: wallet.walletId, balanceMinutes: await ledger.balance(wallet.walletId) });
     },
-    // C9 fills these in (see README "Pairing").
-    'POST /pair': async () => respond(501, { error: 'pairing is not available yet' }),
-    'POST /pair/claim': async () => respond(501, { error: 'pairing is not available yet' }),
+    'POST /pair': async (event) => {
+      const request = parsePairRequest(bodyOf(event));
+      if (!request.ok) return respond(400, { error: request.error });
+      return respond(200, await pairing.pair(request.walletId));
+    },
+    // Unknown, already used and expired codes all get the same 404, so a guess learns nothing more.
+    'POST /pair/claim': async (event) => {
+      const request = parseClaimRequest(bodyOf(event));
+      if (!request.ok) return respond(400, { error: request.error });
+      const claimed = await pairing.claim(request.code);
+      if (!claimed) return respond(404, { error: 'that code is unknown or has expired; ask the phone for a new one' });
+      return respond(200, claimed);
+    },
   };
 
   return async (event) => {

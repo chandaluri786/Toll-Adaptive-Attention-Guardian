@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRouter } from '../src/http.mjs';
 import { createMemoryStore } from './memoryStore.mjs';
+import { createMemoryPairStore } from './memoryPairStore.mjs';
 
 const WALLET = '3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f';
 const silent = { error() {} };
@@ -46,10 +47,40 @@ test('GET /balance without a valid walletId is a 400', async () => {
   assert.equal((await route(getBalance('nope'))).statusCode, 400);
 });
 
-test('pairing routes answer 501 until C9', async () => {
-  const route = createRouter({ store: createMemoryStore(), log: silent });
-  assert.equal((await route({ routeKey: 'POST /pair' })).statusCode, 501);
-  assert.equal((await route({ routeKey: 'POST /pair/claim' })).statusCode, 501);
+const postJson = (routeKey, payload) => ({ routeKey, body: JSON.stringify(payload), isBase64Encoded: false });
+const pairRouter = (now = () => 1763145600000) =>
+  createRouter({ store: createMemoryStore(), pairStore: createMemoryPairStore(), now, log: silent });
+
+test('POST /pair then POST /pair/claim hands over the wallet once', async () => {
+  const route = pairRouter();
+
+  const paired = await route(postJson('POST /pair', { walletId: WALLET }));
+  const { code, expiresAt } = json(paired);
+  const claimed = await route(postJson('POST /pair/claim', { code }));
+  const again = await route(postJson('POST /pair/claim', { code }));
+
+  assert.equal(paired.statusCode, 200);
+  assert.match(code, /^\d{6}$/);
+  assert.equal(expiresAt, 1763145600 + 300);
+  assert.equal(claimed.statusCode, 200);
+  assert.deepEqual(json(claimed), { walletId: WALLET });
+  assert.equal(again.statusCode, 404);
+});
+
+test('an expired code is a 404', async () => {
+  let now = 1763145600000;
+  const route = pairRouter(() => now);
+  const { code } = json(await route(postJson('POST /pair', { walletId: WALLET })));
+  now += 5 * 60 * 1000 + 1;
+  assert.equal((await route(postJson('POST /pair/claim', { code }))).statusCode, 404);
+});
+
+test('malformed pairing input is a 400', async () => {
+  const route = pairRouter();
+  assert.equal((await route(postJson('POST /pair', { walletId: 'nope' }))).statusCode, 400);
+  assert.equal((await route({ routeKey: 'POST /pair' })).statusCode, 400);
+  assert.equal((await route(postJson('POST /pair/claim', { code: '12' }))).statusCode, 400);
+  assert.equal((await route({ routeKey: 'POST /pair/claim', body: 'nope' })).statusCode, 400);
 });
 
 test('unknown routes are a 404', async () => {
