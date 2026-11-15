@@ -2,12 +2,12 @@
 // a live readout (3.2–3.4) → pass (3.5) or not yet (3.6); meetups hand over to B7's flow (3.7–3.9).
 // The sheet talks to a SheetPort (./quest-sheet-port.ts): the real quest engine, or the fakes.
 import type { Quest, TaskType, Verdict } from '../contracts';
-import { asSentence, formatCount, formatMinSec } from './format';
+import { asSentence, clockTime, formatCount, formatMinSec } from './format';
 import type { CaptureVerdict } from './meetup-capture';
 import { CHIP_ORDER, payFor, QUEST_COPY } from './quest-copy';
 import { QUEST_TARGETS } from './quest-rules';
 import type { QuizRound } from './quiz-bank';
-import type { AcceptResult, LiveReadout, Offer, VerifyResult } from './quests';
+import type { AcceptResult, CommitReadout, LiveReadout, Offer, VerifyResult } from './quests';
 import { AWAY_RADIUS_M } from './verifiers';
 import type { MeetupCode } from './wordlist';
 
@@ -126,6 +126,18 @@ function distanceLine(d: number | null): string {
   return `${roundTo10(d)} m from home · keep wandering`;
 }
 
+const READING_COMMITS = 'Reading your commit count on GitHub…';
+
+/** B11: the line under the commit ring — calm about GitHub being slow, offline or unsure. */
+function commitLine(w: CommitReadout | null | undefined): string {
+  if (!w) return READING_COMMITS;
+  if (w.issue === 'not_found') return `GitHub can't find ${w.target} — check Settings → Planner`;
+  if (w.issue === 'rate_limited') return `GitHub needs a breather — next check ${clockTime(w.nextPollAt)}`;
+  if (w.issue) return `Can't reach GitHub — trying again at ${clockTime(w.nextPollAt)}`;
+  if (w.baseline === null || w.latest === null) return READING_COMMITS;
+  return `Watching ${w.target} · next check ${clockTime(w.nextPollAt)}`;
+}
+
 /** The ring's numbers and the line under it, per quest type (3.2 steps, 3.3 away, 3.4 phone-down). */
 export function readout(type: TaskType, live: LiveReadout, target = QUEST_TARGETS[type]): Readout {
   switch (type) {
@@ -141,6 +153,12 @@ export function readout(type: TaskType, live: LiveReadout, target = QUEST_TARGET
       const targetMs = target * 60_000;
       const ms = Math.min(live.offMs, targetMs);
       return { big: formatMinSec(ms), sub: `of ${formatMinSec(targetMs)}`, fraction: clamp01(ms / targetMs), line: 'Face down, screen off. Keep it there.' };
+    }
+    case 'coding': {
+      const w = live.commits;
+      const fresh = w && w.baseline !== null && w.latest !== null ? Math.max(0, w.latest - w.baseline) : 0;
+      const shown = Math.min(fresh, target);
+      return { big: formatCount(shown), sub: `of ${target} new commit${target === 1 ? '' : 's'}`, fraction: clamp01(shown / target), line: commitLine(w) };
     }
     default:
       return { big: '0', sub: `of ${target}`, fraction: 0, line: '' };

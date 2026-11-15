@@ -1,9 +1,11 @@
 // OWNER: B (Spec B — task B1). Rendered inside C's Settings container: home, sleep window, and the
-// timetable editor (blocks up to 4 h, sleep up to 10 h, with the cap message from the design).
+// timetable editor (blocks up to 4 h, sleep up to 10 h, with the cap message from the design), and
+// the GitHub name coding quests watch (B11).
 import React from 'react';
 import { View } from 'react-native';
 import { space } from '../../ui/theme';
 import { SectionTitle } from './fields';
+import GithubField from './GithubField';
 import HomePicker from './HomePicker';
 import SleepWindowEditor from './SleepWindowEditor';
 import TimetableEditor from './TimetableEditor';
@@ -22,6 +24,10 @@ export default function PlannerSection() {
       <View style={{ gap: space.s }}>
         <SectionTitle>Timetable</SectionTitle>
         <TimetableEditor />
+      </View>
+      <View style={{ gap: space.s }}>
+        <SectionTitle>GitHub</SectionTitle>
+        <GithubField />
       </View>
     </View>
   );

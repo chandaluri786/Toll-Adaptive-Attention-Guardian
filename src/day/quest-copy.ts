@@ -58,9 +58,9 @@ export const QUEST_COPY: Record<TaskType, QuestCopy> = {
     offerTitle: 'Push a commit',
     activeTitle: 'Commit',
     chip: 'Commit',
-    checks: ['Your commit count on GitHub', NO_RUSH],
+    checks: ['New commits on your GitHub, checked every 5 minutes', 'Only your username or repo goes to GitHub — no sign-in', NO_RUSH],
     passHeadline: 'Commit pushed.',
-    missHint: null,
+    missHint: 'Commits count from when you started the quest. GitHub can take a few minutes to show them.',
   },
   focus: {
     offerTitle: 'Phone-down focus',
