@@ -1,0 +1,21 @@
+# `sam build && sam deploy` with no prompts. Teardown: `sam delete --stack-name toll-ledger`.
+version = 0.1
+
+[default.global.parameters]
+stack_name = "toll-ledger"
+
+[default.build.parameters]
+cached = true
+
+[default.deploy.parameters]
+stack_name = "toll-ledger"
+region = "us-west-2"
+resolve_s3 = true
+s3_prefix = "toll-ledger"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
+
+[default.delete.parameters]
+stack_name = "toll-ledger"
+region = "us-west-2"

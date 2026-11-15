@@ -1,9 +1,18 @@
-# OWNER: C (Spec C — tasks C8, C9). Skeleton: fill in the handler, then `sam build && sam deploy --guided`.
+# OWNER: C (Spec C — tasks C8, C9). Deploy: `sam build && sam deploy` (settings in samconfig.toml).
+# Free tier: on-demand DynamoDB, HTTP API, 128 MB Lambda, throttled stage, 7-day logs.
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Toll ledger — wallet IDs and minute deltas, nothing else.
 
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    MemorySize: 128
+    Timeout: 5
+
 Resources:
+  # The entire database: walletId, eventId, deltaMinutes, at. Nothing else is ever written.
   LedgerTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -13,23 +22,61 @@ Resources:
         - { AttributeName: eventId, AttributeType: S }
       KeySchema:
         - { AttributeName: walletId, KeyType: HASH }
-        - { AttributeName: eventId, KeyType: RANGE } # idempotent writes
-      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true } # used by pairing codes
+        - { AttributeName: eventId, KeyType: RANGE } # conditional put on this key = idempotent writes
+
+  # For C9: one row per 6-digit code { code, walletId, expiresAt (epoch seconds) }. TTL deletes old codes;
+  # the handler must still check expiresAt, because TTL deletion can lag.
+  PairTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: code, AttributeType: S }
+      KeySchema:
+        - { AttributeName: code, KeyType: HASH }
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
+
+  LedgerHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [GET, POST]
+        AllowHeaders: [content-type]
+        MaxAge: 600
 
   LedgerApi:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: nodejs22.x
       Handler: index.handler
       CodeUri: src/
-      Environment: { Variables: { TABLE: !Ref LedgerTable } }
-      Policies: [{ DynamoDBCrudPolicy: { TableName: !Ref LedgerTable } }]
+      Environment:
+        Variables:
+          TABLE: !Ref LedgerTable
+          PAIR_TABLE: !Ref PairTable
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref PairTable }
       Events:
-        PostEvents: { Type: HttpApi, Properties: { Path: /events, Method: post } }
-        GetBalance: { Type: HttpApi, Properties: { Path: /balance, Method: get } }
-        Pair: { Type: HttpApi, Properties: { Path: /pair, Method: post } }
-        Claim: { Type: HttpApi, Properties: { Path: /pair/claim, Method: post } }
+        PostEvents: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /events, Method: post } }
+        GetBalance: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /balance, Method: get } }
+        Pair: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /pair, Method: post } }
+        Claim: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /pair/claim, Method: post } }
+
+  LedgerApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LedgerApi}
+      RetentionInDays: 7
 
 Outputs:
   ApiUrl:
-    Value: !Sub https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    Description: Base URL for the phone app, C9 pairing and the C10 extension.
+    Value: !Sub https://${LedgerHttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  LedgerTableName:
+    Value: !Ref LedgerTable
+  PairTableName:
+    Value: !Ref PairTable

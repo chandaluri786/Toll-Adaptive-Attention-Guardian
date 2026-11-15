@@ -1,4 +1,8 @@
-// OWNER: C (Spec C — tasks C8, C9). Store only eventId, walletId, deltaMinutes, at.
-export const handler = async (event) => {
-  return { statusCode: 501, body: JSON.stringify({ error: `not implemented yet: ${event.routeKey}` }) };
-};
+// OWNER: C (Spec C — tasks C8, C9). Lambda entry: wires the DynamoDB store into the router.
+// Stores only eventId, walletId, deltaMinutes, at.
+import { createRouter } from './http.mjs';
+import { createDynamoStore } from './dynamo.mjs';
+
+const route = createRouter({ store: createDynamoStore({ tableName: process.env.TABLE }) });
+
+export const handler = (event) => route(event);

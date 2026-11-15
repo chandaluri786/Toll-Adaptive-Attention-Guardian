@@ -1,0 +1,7 @@
+{
+  "name": "toll-ledger-function",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "No dependencies: the Lambda nodejs22.x runtime provides @aws-sdk/client-dynamodb."
+}
