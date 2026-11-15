@@ -121,6 +121,7 @@ Calm, specific and kind. Copy comes from the design; do not reword it. **Never u
 
 - **No Supermemory opt-in screen (7.4).** Supermemory was dropped from the project.
 - **"Wait 60 seconds" ends on "That's a minute"** and lets the user choose (close the app or take a quest), as in the design. It does not close the screen by itself.
+- **Set home (6.3) shows "Home saved" with a Change action, not a street address.** Turning coordinates into an address on Android uses Google's online lookup, which would send the home location off the phone and break the privacy model. A pin or circle drawn without any lookup, or a label the user types ("Home", "Dorm"), is fine. Do not add a geocoding library.
 
 ## Preview without a phone
 

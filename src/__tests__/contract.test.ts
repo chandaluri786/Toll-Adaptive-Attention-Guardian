@@ -16,6 +16,7 @@ test('every interface in the contract is wired', () => {
 
 test('Cloudy: spending umbrella time opens a window and lowers the balance', () => {
   debug.engine.postureSource.setPosture('metered');
+  debug.ledger.setBalance(30); // S2: umbrella 30 (the real ledger starts each day at 0)
   const before = services.ledger.balance();
   const r = services.ledger.spend(15, 'restricted');
   expect(r.ok).toBe(true);
@@ -60,9 +61,12 @@ test('device fake scripts: walk 600 m for 45 min emits 45 location samples', () 
   expect(got).toHaveLength(45);
 });
 
-test('Forecast fake history has 180 deterministic days', () => {
+test('Forecast history is deterministic, ends today, and never pads past what the ledger has seen', () => {
+  // The real ledger only reports days since it began (a fresh install has 1), so Forecast can show its
+  // "needs 3 days" empty state; the fake returns 180 sample days. Either way: at most what was asked.
   const a = services.ledger.history(180);
   const b = services.ledger.history(180);
-  expect(a).toHaveLength(180);
+  expect(a.length).toBeGreaterThanOrEqual(1);
+  expect(a.length).toBeLessThanOrEqual(180);
   expect(a).toEqual(b);
 });

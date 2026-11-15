@@ -1,36 +1,172 @@
 // OWNER: C (Spec C — task C6). Not optional: a real weather change takes ~3.5 min, longer than the
-// demo slot. Forces the clock, weather, free time and steps; seeds every folder at once.
-import React from 'react';
-import { Text } from 'react-native';
+// demo slot. Forces the clock (time and speed), weather, free time and steps; seeds every folder
+// at once; resets everything. Works on fakes and on the real engine: optional controls are
+// feature-detected in ../demo.ts, which holds all the logic.
+import React, { useEffect, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { debug } from '../../services';
-import type { Seed } from '../../contracts';
-import { Button, Placeholder, useTheme } from '../../ui/components';
-import { HOUR } from '../../shared/emitter';
+import { useBalance, usePosture } from '../../shared/hooks';
+import { Button, useTheme, WeatherChip } from '../../ui/components';
+import { space } from '../../ui/theme';
+import { weatherFor } from '../../ui/weather';
+import type { Posture, Seed } from '../../contracts';
+import {
+  advance,
+  applySeed,
+  atLocalTime,
+  capabilitiesOf,
+  DEMO_UMBRELLA_MIN,
+  forceWeather,
+  FULL_FREE_TIME_MIN,
+  quickOpens,
+  resetEverything,
+  setFreeTimeLeft,
+  SPEEDS,
+} from '../demo';
+import { formatHm } from '../time';
+import { Body, Card, Choice, ChoiceRow, Muted, ScreenTitle } from './parts';
 
-const seedAll = (s: Seed) => {
-  debug.engine.seed(s);
-  debug.ledger.seed(s);
-  debug.device.seed(s);
-  debug.day.seed(s);
-};
+const REFRESH_MS = 1000;
+const WEATHERS: Posture[] = ['open', 'metered', 'sealed'];
+const SEEDS: { seed: Seed; label: string }[] = [
+  { seed: 'demo_2pm', label: '2pm lecture (the demo)' },
+  { seed: 'late_night', label: 'Late night' },
+  { seed: 'no_plan', label: 'No plan today' },
+];
+
+/** Re-render every second so the clock readout follows a sped-up clock. */
+function useClockNow(): number {
+  const { clock } = debug.engine;
+  const [now, setNow] = useState(clock.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(clock.now()), REFRESH_MS);
+    const unsub = clock.onTick((t) => setNow(t));
+    return () => {
+      clearInterval(id);
+      unsub();
+    };
+  }, [clock]);
+  return now;
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <View style={{ gap: space.s, paddingVertical: space.s }}>
+        <Body>{title}</Body>
+        {children}
+      </View>
+    </Card>
+  );
+}
 
 export default function DemoPanel() {
   const t = useTheme();
-  const ps = debug.engine.postureSource;
+  const now = useClockNow();
+  const state = usePosture();
+  const balance = useBalance();
+  const caps = capabilitiesOf(debug);
+  const { clock } = debug.engine;
+  const [speed, setSpeed] = useState(clock.speed());
+  const [scrolling, setScrolling] = useState(false);
+  const refresh = () => {
+    setSpeed(clock.speed());
+    setScrolling(false);
+  };
+  const changeSpeed = (x: number) => {
+    clock.setSpeed(x);
+    setSpeed(clock.speed());
+  };
+  const toggleScrolling = () => {
+    debug.device.simulateScrolling?.(!scrolling);
+    setScrolling(!scrolling);
+  };
+
   return (
-    <Placeholder title="Demo panel" owner="C" tasks="C6">
-      <Text style={{ color: t.textMuted }}>Drives the fakes now; drives the real engine after integration.</Text>
-      <Button title="Clear skies" onPress={() => ps.setPosture('open')} />
-      <Button title="Cloudy" onPress={() => ps.setPosture('metered')} />
-      <Button title="Storm" onPress={() => ps.setPosture('sealed')} />
-      <Button title="Clouds gathering (grace) on/off" onPress={() => ps.setGrace(!ps.get().grace)} />
-      <Button title="Use up free time" onPress={() => ps.setAllowance(0)} />
-      <Button title="Clock +1 hour" onPress={() => debug.engine.clock.setNow(debug.engine.clock.now() + HOUR)} />
-      <Button title="Add 2,000 steps" onPress={() => debug.day.addSteps(2000)} />
-      <Button title="Seed: 2pm lecture (demo)" onPress={() => seedAll('demo_2pm')} />
-      <Button title="Seed: late night" onPress={() => seedAll('late_night')} />
-      <Button title="Seed: no plan" onPress={() => seedAll('no_plan')} />
-      <Button title="Reset everything" onPress={() => seedAll('fresh')} />
-    </Placeholder>
+    <ScrollView style={{ backgroundColor: t.background }} contentContainerStyle={{ padding: space.m, paddingTop: space.xl, gap: space.m }}>
+      <ScreenTitle>Demo panel</ScreenTitle>
+      <Card>
+        <View style={{ gap: space.xs, paddingVertical: space.s }}>
+          <WeatherChip posture={state.posture} />
+          <Body>
+            {formatHm(now)} · {speed}× · Focus Pressure {state.score}
+            {state.grace ? ' · clouds gathering' : ''}
+          </Body>
+          <Muted>
+            Free time left {state.allowanceLeftMin} min · Umbrella time {balance} min
+          </Muted>
+        </View>
+      </Card>
+
+      <Section title="Time">
+        <ChoiceRow>
+          {SPEEDS.map((x) => (
+            <Choice key={x} label={`${x}×`} selected={speed === x} onPress={() => changeSpeed(x)} />
+          ))}
+        </ChoiceRow>
+        <Muted>At 60× a 3½-minute weather change takes about 4 seconds.</Muted>
+        <ChoiceRow>
+          <Choice label="+15 min" onPress={() => advance(clock, 15)} />
+          <Choice label="+1 hour" onPress={() => advance(clock, 60)} />
+          <Choice label="14:00" onPress={() => clock.setNow(atLocalTime(clock.now(), 14 * 60))} />
+          <Choice label="Check the sky now" onPress={() => clock.tick()} />
+        </ChoiceRow>
+      </Section>
+
+      <Section title="Weather">
+        <ChoiceRow>
+          {WEATHERS.map((p) => (
+            <Choice key={p} label={weatherFor(p).name} selected={state.posture === p} onPress={() => forceWeather(debug, p)} />
+          ))}
+          {caps.canRelease ? <Choice label="Back to the forecast" onPress={() => forceWeather(debug, null)} /> : null}
+        </ChoiceRow>
+        <Choice
+          label={state.grace ? 'Clouds gathering: on' : 'Clouds gathering: off'}
+          selected={state.grace}
+          onPress={() => debug.engine.postureSource.setGrace(!state.grace)}
+        />
+      </Section>
+
+      <Section title="Free time and phone use">
+        <ChoiceRow>
+          <Choice label="Use up free time" onPress={() => setFreeTimeLeft(debug, 0)} />
+          <Choice label="−30 min" onPress={() => setFreeTimeLeft(debug, state.allowanceLeftMin - 30)} />
+          <Choice label="Full day" onPress={() => setFreeTimeLeft(debug, FULL_FREE_TIME_MIN)} />
+        </ChoiceRow>
+        <ChoiceRow>
+          {caps.canScroll ? <Choice label={scrolling ? 'Stop scrolling' : 'Start scrolling'} selected={scrolling} onPress={toggleScrolling} /> : null}
+          {caps.canQuickOpen ? <Choice label="5 quick opens" onPress={() => quickOpens(debug)} /> : null}
+        </ChoiceRow>
+      </Section>
+
+      <Section title="Steps and umbrella time">
+        <ChoiceRow>
+          <Choice label="+500 steps" onPress={() => debug.day.addSteps(500)} />
+          <Choice label="+2,000 steps" onPress={() => debug.day.addSteps(2000)} />
+          <Choice label={`Umbrella ${DEMO_UMBRELLA_MIN} min`} onPress={() => debug.ledger.setBalance(DEMO_UMBRELLA_MIN)} />
+        </ChoiceRow>
+      </Section>
+
+      <Section title="Start from">
+        {SEEDS.map(({ seed, label }) => (
+          <Button
+            key={seed}
+            title={label}
+            onPress={() => {
+              applySeed(debug, seed);
+              refresh();
+            }}
+          />
+        ))}
+        <Button
+          primary
+          title="Reset everything"
+          onPress={() => {
+            resetEverything(debug);
+            refresh();
+          }}
+        />
+      </Section>
+    </ScrollView>
   );
 }
