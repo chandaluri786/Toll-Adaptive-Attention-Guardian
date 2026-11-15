@@ -1,0 +1,22 @@
+# `sam build && sam deploy` with no prompts. Only us-east-2 is allowed by the org policy.
+# Teardown: `sam delete --stack-name toll-quiz --region us-east-2`.
+version = 0.1
+
+[default.global.parameters]
+stack_name = "toll-quiz"
+
+[default.build.parameters]
+cached = true
+
+[default.deploy.parameters]
+stack_name = "toll-quiz"
+region = "us-east-2"
+resolve_s3 = true
+s3_prefix = "toll-quiz"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
+
+[default.delete.parameters]
+stack_name = "toll-quiz"
+region = "us-east-2"
