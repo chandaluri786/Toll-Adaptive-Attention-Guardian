@@ -11,6 +11,9 @@ import type {
   UsageFeed,
 } from '../contracts';
 import { createEmitter, MIN } from '../shared/emitter';
+import { createFakeBlocker, createFakeInstalledApps, createFakeNotifier, createFakePermissions } from './fakePorts';
+import { createDeviceKit } from './kit';
+import { createMemoryStore } from './storage';
 
 export const HOME = { lat: 33.4242, lon: -111.9281 }; // shared with B's fake Planner
 
@@ -81,5 +84,24 @@ export function createFakeDevice(get: GetServices) {
     },
   };
 
-  return { services: { usageFeed, deviceSignals }, debug };
+  // The same kit the real device uses (enforcer, fail-open, notifications, app list), on fake ports.
+  const fakeBlocker = createFakeBlocker();
+  const fakePermissions = createFakePermissions();
+  const fakeNotifier = createFakeNotifier();
+  const kit = createDeviceKit(
+    {
+      blocker: fakeBlocker,
+      permissions: fakePermissions,
+      installedApps: createFakeInstalledApps(),
+      notifier: fakeNotifier,
+      store: createMemoryStore(),
+    },
+    get,
+  );
+
+  return {
+    services: { usageFeed, deviceSignals },
+    debug: Object.assign(debug, { blocker: fakeBlocker, permissions: fakePermissions, notifier: fakeNotifier }),
+    kit,
+  };
 }

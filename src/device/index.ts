@@ -1,19 +1,29 @@
 // OWNER: A (Spec A — Device). See docs/specs/A-device.md.
-// Provides: UsageFeed, DeviceSignals. Consumes (via get()): Clock, PostureSource, Ledger, Governor,
-// Planner, Quests.
+// Provides: UsageFeed, DeviceSignals (the contract) + `kit`, everything else A's own screens need.
+// Consumes (via get()): Clock, PostureSource, Ledger, Governor, Planner, Quests.
 import type { GetServices } from '../contracts';
 import { createFakeDevice } from './fakes';
 
-/** Flip to true at integration step 2, once A2, A3 and A9 work on the demo phone. */
+/**
+ * Flip to true at integration step 2, once A2, A3 and A9 work on the demo phone.
+ * false = everything runs on fakes (tests, the browser preview, and any phone before integration).
+ */
 export const USE_REAL = false;
 
 export function createDevice(get: GetServices) {
-  if (USE_REAL) return createRealDevice(get);
+  if (USE_REAL) return createRealDeviceLazily(get);
   return createFakeDevice(get);
 }
 
-function createRealDevice(_get: GetServices): ReturnType<typeof createFakeDevice> {
-  // A2: foreground app feed (expo-app-blocker monitoring). A9: screen + location bridge.
-  // See ./native/appBlocker.ts for the blocker wrapper.
-  throw new Error('Real device layer not implemented yet — tasks A2, A3, A9');
+/**
+ * The real device imports native modules (expo-app-blocker, expo-location, ...) that exist only in a
+ * dev build. Requiring it here, not at the top of the file, keeps Jest and the browser preview from
+ * ever loading them.
+ */
+function createRealDeviceLazily(get: GetServices): ReturnType<typeof createFakeDevice> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createRealDevice } = require('./native/real') as typeof import('./native/real');
+  return createRealDevice(get) as unknown as ReturnType<typeof createFakeDevice>;
 }
+
+export type DeviceModule = ReturnType<typeof createFakeDevice>;
