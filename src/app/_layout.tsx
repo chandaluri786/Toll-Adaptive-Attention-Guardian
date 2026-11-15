@@ -7,6 +7,10 @@ import { FontGate } from '../ui/FontGate';
 import QuestSheetHost from '../day/screens/QuestSheetHost';
 import PlanMyDaySheet from '../day/screens/PlanMyDaySheet';
 
+// A blocker deep link (toll://blocked?…) can be the first URL a fresh Activity sees. Anchoring the stack on
+// the tabs puts (tabs) under /blocked, so the full-screen modal is presented as a modal, not as a card.
+export const unstable_settings = { anchor: '(tabs)' };
+
 export default function RootLayout() {
   return (
     <FontGate>
