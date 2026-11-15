@@ -17,7 +17,11 @@ export const BLOCK_WARNING_MS = 10 * MIN;
 /** The day (and its reminders) resets at 04:00, matching the ledger. */
 export const DAY_RESET_HOUR = 4;
 
-export const dayKey = (now: number) => new Date(now - DAY_RESET_HOUR * HOUR).toISOString().slice(0, 10);
+/** YYYY-MM-DD in the phone's LOCAL time (toISOString would be UTC and flip the day at the wrong hour). */
+export const localDateKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+export const dayKey = (now: number) => localDateKey(new Date(now - DAY_RESET_HOUR * HOUR));
 
 export const fmtClock = (t: number) => {
   const d = new Date(t);

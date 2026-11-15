@@ -5,6 +5,7 @@
 // the tests (__tests__/forecast.test.ts) check every number. Copy is calm and honest: no shaming, no
 // streaks, no levels (planning doc, "Wellbeing guardrails").
 import type { DaySummary, TaskType } from '../contracts';
+import { localDateKey } from './notifications';
 
 export type Range = 'week' | 'month' | 'six_months';
 
@@ -150,7 +151,7 @@ export const MIN_DAYS_FOR_FORECAST = 3;
 const addDays = (date: string, n: number) => {
   const d = at(date);
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return localDateKey(d);
 };
 
 /**

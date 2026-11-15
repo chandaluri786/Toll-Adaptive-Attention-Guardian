@@ -93,6 +93,11 @@ describe('plan reminders', () => {
     expect(dayKey(at(3, 59))).not.toBe(dayKey(at(4, 0)));
     expect(dayKey(at(0, 30))).toBe(dayKey(at(3, 30)));
   });
+
+  it('dayKey is the LOCAL date, whatever the phone's time zone', () => {
+    expect(dayKey(at(12))).toBe('2026-11-16');
+    expect(dayKey(at(3, 59))).toBe('2026-11-15');
+  });
 });
 
 describe('block warning', () => {
