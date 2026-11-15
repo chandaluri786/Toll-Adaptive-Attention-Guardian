@@ -17,16 +17,35 @@ import * as Blocker from 'expo-app-blocker';
 import type { BlockerPort } from '../ports';
 
 /** The brief native overlay before our own screen opens: calm, on-brand, no red. */
+const OVERLAY = {
+  overlayTitle: 'Toll',
+  overlayText: 'Checking the weather…',
+  overlayBackgroundColor: '#1A1440', // Storm indigo
+  overlayTitleColor: '#F4F1FF',
+  overlayTextColor: '#C9C2FF',
+} as const;
+
+type NotificationConfig = { notificationTitle: string; notificationText: string };
+
+// The package's native setAndroidConfig writes EVERY key on each call: a key left out is stored as null
+// and falls back to the package default (the white "App Blocked" overlay). So we keep the whole config
+// here and always send all of it. Note: these notification keys are the one shown on each intercept
+// (the package's foreground-service notification is fixed native text and cannot be changed from JS).
+let notification: NotificationConfig = { notificationTitle: 'Toll', notificationText: 'Watching the weather' };
+
+const sendConfig = (n: NotificationConfig) => Blocker.configureAndroid({ ...OVERLAY, ...n });
+
 export function configureOverlay(): void {
-  Blocker.configureAndroid({
-    overlayTitle: 'Toll',
-    overlayText: 'Checking the weather…',
-    overlayBackgroundColor: '#1A1440', // Storm indigo
-    overlayTitleColor: '#F4F1FF',
-    overlayTextColor: '#C9C2FF',
-    notificationTitle: 'Toll',
-    notificationText: 'Watching the weather',
-  });
+  sendConfig(notification);
+}
+
+/** Updates the notification text, keeping the overlay. Returns false when nothing changed (no native call). */
+function updateNotification(title: string, text: string): boolean {
+  if (notification.notificationTitle === title && notification.notificationText === text) return false;
+  const next = { notificationTitle: title, notificationText: text };
+  sendConfig(next); // if this throws, `notification` keeps the old value so the next call retries
+  notification = next;
+  return true;
 }
 
 export function createNativeBlocker(): BlockerPort {
@@ -50,7 +69,7 @@ export function createNativeBlocker(): BlockerPort {
     remainingUnlockSeconds: () => safe('remainingUnlockSeconds', () => Blocker.getRemainingUnlockTime(), 0),
     drainIntercepts: () => safe('drainIntercepts', () => Blocker.drainPendingIntercepts(), []),
     setNotificationText: (title, text) =>
-      safe('setNotificationText', () => Blocker.configureAndroid({ notificationTitle: title, notificationText: text }), undefined),
+      safe('setNotificationText', () => void updateNotification(title, text), undefined),
   };
 }
 
