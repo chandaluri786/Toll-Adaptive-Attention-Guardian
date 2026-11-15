@@ -126,33 +126,45 @@ describe('events: append-only, balance = sum, idempotent ids', () => {
   });
 });
 
+/** One first quest of every category: 25 + 25 + 25 + 20 + 20 + 15 = 130 minutes. */
+const ONE_OF_EACH = ['fitness', 'place', 'meetup', 'study', 'coding', 'focus'] as const;
+function creditOneOfEach(h: ReturnType<typeof harness>) {
+  ONE_OF_EACH.forEach((category, i) => h.ledger.credit({ category, questId: `first-${i}`, rate: 1 }));
+}
+
 describe('daily mint cap: 150', () => {
-  it('the 7th fitness quest mints 0 (6 × 25 = 150)', () => {
+  it('once 150 is minted the next quest mints 0', () => {
     const h = harness(at(15, 9));
-    for (let i = 1; i <= 6; i++) h.ledger.credit({ category: 'fitness', questId: `f${i}`, rate: 1 });
-    const seventh = h.ledger.credit({ category: 'fitness', questId: 'f7', rate: 1 });
-    expect(seventh.event.deltaMinutes).toBe(0);
+    creditOneOfEach(h); // 130
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 }); // +15 = 145
+    h.ledger.credit({ category: 'place', questId: 'p2', rate: 1 }); // +5 (15, capped) = 150
+    const next = h.ledger.credit({ category: 'meetup', questId: 'm2', rate: 1 });
+    expect(next.event.deltaMinutes).toBe(0);
     expect(h.ledger.balance()).toBe(150);
   });
 
   it('a quest that crosses the cap mints only what is left', () => {
     const h = harness(at(15, 9));
-    for (let i = 1; i <= 5; i++) h.ledger.credit({ category: 'fitness', questId: `f${i}`, rate: 1 });
-    h.ledger.credit({ category: 'study', questId: 's', rate: 1 }); // 145
-    expect(h.ledger.credit({ category: 'fitness', questId: 'f6', rate: 1 }).event.deltaMinutes).toBe(5);
+    creditOneOfEach(h); // 130
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 }); // 145
+    expect(h.ledger.credit({ category: 'place', questId: 'p2', rate: 1 }).event.deltaMinutes).toBe(5);
   });
 
   it('spending does not give cap room back', () => {
     const h = harness(at(15, 9));
     h.weather('metered');
-    for (let i = 1; i <= 6; i++) h.ledger.credit({ category: 'fitness', questId: `f${i}`, rate: 1 });
+    creditOneOfEach(h);
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 });
+    h.ledger.credit({ category: 'place', questId: 'p2', rate: 1 }); // 150
     h.ledger.spend(100, 'restricted');
-    expect(h.ledger.credit({ category: 'focus', questId: 'x', rate: 1 }).event.deltaMinutes).toBe(0);
+    expect(h.ledger.credit({ category: 'meetup', questId: 'x', rate: 1 }).event.deltaMinutes).toBe(0);
   });
 
   it('the cap refills at 04:00', () => {
     const h = harness(at(15, 22));
-    for (let i = 1; i <= 6; i++) h.ledger.credit({ category: 'fitness', questId: `f${i}`, rate: 1 });
+    creditOneOfEach(h);
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 });
+    h.ledger.credit({ category: 'place', questId: 'p2', rate: 1 }); // 150
     h.setNow(at(16, 4));
     expect(h.ledger.credit({ category: 'focus', questId: 'x', rate: 1 }).event.deltaMinutes).toBe(15);
   });
@@ -314,8 +326,8 @@ describe('the 04:00 local reset', () => {
 
   it('a window bought at 03:50 still runs past 04:00', () => {
     const h = harness(at(16, 3, 50));
-    h.debug.setBalance(20);
-    h.ledger.spend(20, 'restricted');
+    h.debug.setBalance(40);
+    h.ledger.spend(20, 'restricted'); // late night: 20 minutes cost 40
     h.setNow(at(16, 4, 5));
     expect(h.ledger.activeWindows()).toHaveLength(1);
     expect(h.ledger.balance()).toBe(0);
@@ -411,7 +423,7 @@ describe('history(days)', () => {
       expect.objectContaining({ date: '2026-11-14', earned: 25, spent: 10, questOpenedMin: 0, questsByCategory: { fitness: 1 } }),
     );
     expect(today).toEqual(
-      expect.objectContaining({ date: '2026-11-15', earned: 30, spent: 0, questOpenedMin: 15, questsByCategory: { focus: 2 } }),
+      expect.objectContaining({ date: '2026-11-15', earned: 24, spent: 0, questOpenedMin: 9, questsByCategory: { focus: 2 } }), // 2nd focus pays 60%
     );
   });
 
@@ -685,5 +697,131 @@ describe('absorb: spends made elsewhere (C9 pull-back)', () => {
     h.absorb([{ id: 'ext-a', deltaMinutes: -1, at: at(15, 13) }]);
 
     expect(seen).toHaveLength(1);
+  });
+});
+
+describe('diminishing returns (C11): same category, one local day', () => {
+  it('four fitness quests mint 25, 15, 8, 0', () => {
+    // Arrange
+    const h = harness(at(15, 9));
+
+    // Act
+    const minted = [1, 2, 3, 4].map((i) => h.ledger.credit({ category: 'fitness', questId: `f${i}`, rate: 1 }).event.deltaMinutes);
+
+    // Assert
+    expect(minted).toEqual([25, 15, 8, 0]);
+    expect(h.ledger.balance()).toBe(48);
+  });
+
+  it('each category counts on its own', () => {
+    const h = harness(at(15, 9));
+    h.ledger.credit({ category: 'fitness', questId: 'f1', rate: 1 });
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 });
+    expect(h.ledger.credit({ category: 'study', questId: 's1', rate: 1 }).event.deltaMinutes).toBe(20);
+  });
+
+  it('a capped quest still counts as a repeat (it was logged)', () => {
+    const h = harness(at(15, 9));
+    creditOneOfEach(h);
+    h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 });
+    h.ledger.credit({ category: 'place', questId: 'p2', rate: 1 }); // cap reached
+    h.ledger.credit({ category: 'focus', questId: 'x2', rate: 1 }); // 0, but the 2nd focus
+    h.setNow(at(16, 9));
+    expect(h.ledger.credit({ category: 'focus', questId: 'y1', rate: 1 }).event.deltaMinutes).toBe(15); // new day
+  });
+
+  it('the count starts again at 04:00 (03:59 still belongs to yesterday)', () => {
+    const h = harness(at(15, 22));
+    h.ledger.credit({ category: 'fitness', questId: 'f1', rate: 1 });
+    h.setNow(at(16, 3, 59));
+    expect(h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 }).event.deltaMinutes).toBe(15);
+    h.setNow(at(16, 4));
+    expect(h.ledger.credit({ category: 'fitness', questId: 'f3', rate: 1 }).event.deltaMinutes).toBe(25);
+  });
+
+  it('a repeated questId is not a repeat quest (mints once, no count)', () => {
+    const h = harness(at(15, 9));
+    h.ledger.credit({ category: 'fitness', questId: 'q', rate: 1 });
+    h.ledger.credit({ category: 'fitness', questId: 'q', rate: 1 });
+    expect(h.ledger.credit({ category: 'fitness', questId: 'r', rate: 1 }).event.deltaMinutes).toBe(15);
+  });
+
+  it('in a Storm the window is the diminished mint (2nd fitness → 15 min)', () => {
+    const h = harness(at(15, 10));
+    h.weather('sealed');
+    h.ledger.credit({ category: 'fitness', questId: 'f1', rate: 1 });
+    const { event, window } = h.ledger.credit({ category: 'fitness', questId: 'f2', rate: 1 });
+    expect(event.deltaMinutes).toBe(15);
+    expect(window?.until).toBe(at(15, 10, 15));
+  });
+
+  it('a 4th quest in a Storm mints 0 and opens no window', () => {
+    const h = harness(at(15, 10));
+    h.weather('sealed');
+    for (let i = 1; i <= 3; i++) h.ledger.credit({ category: 'focus', questId: `f${i}`, rate: 1 });
+    const fourth = h.ledger.credit({ category: 'focus', questId: 'f4', rate: 1 });
+    expect(fourth).toEqual({ event: expect.objectContaining({ deltaMinutes: 0 }), window: null });
+  });
+});
+
+describe('late-night 2× cost (C11): from 23:00 to the 04:00 reset', () => {
+  it('Cloudy at 23:30: 15 minutes of umbrella cost 30, the window is still 15 min', () => {
+    // Arrange
+    const h = harness(at(15, 23, 30));
+    h.debug.setBalance(40);
+    h.weather('metered');
+
+    // Act
+    const r = h.ledger.spend(15, 'restricted');
+
+    // Assert
+    expect(r).toEqual({ ok: true, window: expect.objectContaining({ until: at(15, 23, 45), source: 'spend' }) });
+    expect(h.ledger.balance()).toBe(10);
+    expect(h.debug.events().at(-1)).toEqual(expect.objectContaining({ deltaMinutes: -30, category: 'spend' }));
+  });
+
+  it('still 2× at 02:00 (same Toll day), back to 1:1 at 22:59', () => {
+    const late = harness(at(16, 2));
+    late.debug.setBalance(30);
+    late.ledger.spend(10, 'restricted');
+    expect(late.ledger.balance()).toBe(10);
+
+    const evening = harness(at(15, 22, 59));
+    evening.debug.setBalance(30);
+    evening.ledger.spend(10, 'restricted');
+    expect(evening.ledger.balance()).toBe(20);
+  });
+
+  it('the shortfall is in doubled minutes', () => {
+    const h = harness(at(15, 23, 30));
+    h.debug.setBalance(20);
+    h.weather('metered');
+    expect(h.ledger.spend(15, 'restricted')).toEqual({ ok: false, shortfall: 10 });
+    expect(h.ledger.balance()).toBe(20);
+  });
+
+  it('still refused in Storm with the doubled shortfall', () => {
+    const h = harness(at(15, 23, 30));
+    h.debug.setBalance(60);
+    h.weather('sealed');
+    expect(h.ledger.spend(15, 'restricted')).toEqual({ ok: false, shortfall: 30 });
+  });
+
+  it('a Storm quest at night still opens its full mint (the multiplier is on banked spending)', () => {
+    const h = harness(at(15, 23, 30));
+    h.weather('sealed');
+    const { window } = h.ledger.credit({ category: 'fitness', questId: 'f1', rate: 1 });
+    expect(window?.until).toBe(at(15, 23, 55));
+    expect(h.ledger.balance()).toBe(0);
+  });
+
+  it('history counts the doubled cost as spent; the day still closes to 0', () => {
+    const h = harness(at(15, 23, 30));
+    h.debug.setBalance(40);
+    h.ledger.spend(15, 'restricted');
+    h.setNow(at(16, 9));
+    const yesterday = h.ledger.history(2).find((d) => d.date === dayKey(at(15, 23, 30)));
+    expect(yesterday?.spent).toBe(30);
+    expect(sumOf(h)).toBe(0);
   });
 });

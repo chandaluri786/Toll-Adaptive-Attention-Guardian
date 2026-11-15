@@ -1,5 +1,6 @@
-// OWNER: C (task C5). The real ledger: append-only minute events, the 04:00 reset, the daily mint
-// cap, 1:1 Cloudy spending, the Sealed rule, and 180 days of local DaySummary rows for Forecast.
+// OWNER: C (tasks C5, C11). The real ledger: append-only minute events, the 04:00 reset, the daily
+// mint cap, diminishing returns (C11), 1:1 Cloudy spending (2× after 23:00, C11), the Sealed rule,
+// and 180 days of local DaySummary rows for Forecast.
 // Reaches the clock, posture, usage feed and planner only through get() and the contract.
 // Not wired yet: session 5 swaps it into index.ts (USE_REAL stays false until then).
 import type {
@@ -17,8 +18,8 @@ import type {
 } from '../contracts';
 import { createEmitter, MIN } from '../shared/emitter';
 import { createDayTracker, type DayTracker } from './dayTracker';
-import { HISTORY_DAYS } from './economy';
-import { balanceOn, mintedOn, mintFor, parseEvents, prune, resetsDue, summarizeEvents } from './events';
+import { HISTORY_DAYS, spendCost } from './economy';
+import { balanceOn, mintedOn, mintFor, parseEvents, prune, questsOn, resetsDue, summarizeEvents } from './events';
 import { readJson, type KV } from './kv';
 import { dayKey, lastDays } from './time';
 
@@ -147,11 +148,12 @@ export function createRealLedger({
     spend(minutes, scope): SpendResult {
       const today = settle();
       if (!Number.isInteger(minutes) || minutes <= 0) return { ok: false, shortfall: 0 };
-      if (weather() === 'sealed') return { ok: false, shortfall: minutes }; // Sealed rule: banked minutes can't open
+      const cost = spendCost(minutes, now()); // 2× from 23:00 to 04:00; the window is still `minutes` long
+      if (weather() === 'sealed') return { ok: false, shortfall: cost }; // Sealed rule: banked minutes can't open
       const balance = balanceOn(events, today);
-      if (balance < minutes) return { ok: false, shortfall: minutes - balance };
+      if (balance < cost) return { ok: false, shortfall: cost - balance };
       const id = uniqueId('spend');
-      append({ id, at: now(), deltaMinutes: -minutes, category: 'spend' });
+      append({ id, at: now(), deltaMinutes: -cost, category: 'spend' });
       const window = openWindow(`w-${id}`, scope, minutes, 'spend');
       commit();
       return { ok: true, window };
@@ -164,7 +166,7 @@ export function createRealLedger({
         const open = windows.find((w) => w.id === `w-${id}` && w.until > now()) ?? null;
         return { event: existing, window: open }; // same quest twice mints once
       }
-      const minted = mintFor(category, rate, mintedOn(events, today));
+      const minted = mintFor(category, rate, mintedOn(events, today), questsOn(events, today, category));
       const event: LedgerEvent = { id, at: now(), deltaMinutes: minted, category, questId };
       if (weather() !== 'sealed' || minted === 0) {
         append(event);

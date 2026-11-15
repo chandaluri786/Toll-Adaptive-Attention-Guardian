@@ -9,7 +9,7 @@ import { useTheme } from '../../ui/components';
 import { Body, Card } from '../../ui/primitives';
 import { fonts, space } from '../../ui/theme';
 import { FREE_TIME_MIN } from '../freeTime';
-import { applyStep, COPY, formatDuration, pressureMeter, weatherStoreOr, type ThresholdField } from '../thresholds';
+import { applyStep, COPY, ECONOMY_ROWS, formatDuration, pressureMeter, weatherStoreOr, type ThresholdField } from '../thresholds';
 import type { WeatherConfig } from '../weatherConfig';
 import { Divider, Row, Stepper } from './parts';
 
@@ -87,6 +87,12 @@ export default function EngineSection() {
         <Divider />
         <Row title="Umbrella cost" subtitle="Earned minutes" right="1 min = 1 min" />
         <Divider />
+        {ECONOMY_ROWS.map((row) => (
+          <React.Fragment key={row.title}>
+            <Row title={row.title} subtitle={row.subtitle} right={row.right} />
+            <Divider />
+          </React.Fragment>
+        ))}
         <Row title="New day" subtitle="Free time comes back" right="04:00" />
       </Card>
       {note ? <Body muted small>{note}</Body> : null}

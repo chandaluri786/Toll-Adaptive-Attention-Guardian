@@ -3,7 +3,7 @@
 // that day's last instant, so every past day sums to 0 and the server's sum of synced deltas
 // matches the phone (only id, at, deltaMinutes ever sync).
 import type { LedgerEvent, TaskType } from '../contracts';
-import { DAILY_MINT_CAP, EARNING } from './economy';
+import { DAILY_MINT_CAP, EARNING, repeatPercent } from './economy';
 import { dayEnd, dayKey } from './time';
 
 const CATEGORIES = new Set<string>([...Object.keys(EARNING), 'spend', 'emergency', 'reset']);
@@ -50,11 +50,19 @@ export const balanceOn = (events: readonly LedgerEvent[], date: string) => sum(e
 export const mintedOn = (events: readonly LedgerEvent[], date: string) =>
   sum(eventsOn(events, date).filter((e) => isQuestCategory(e.category)));
 
-/** Minutes a verified quest mints: earning table × rate, rounded, never past the day's cap. */
-export function mintFor(category: TaskType, rate: number, mintedToday: number): number {
+/** How many quests of `category` were logged on `date` (capped and zero mints count: they happened). */
+export const questsOn = (events: readonly LedgerEvent[], date: string, category: TaskType) =>
+  eventsOn(events, date).filter((e) => e.category === category).length;
+
+/**
+ * Minutes a verified quest mints: earning table × rate × the repeat percent (100/60/30/0 for the
+ * day's 1st/2nd/3rd/4th+ of that category), rounded half-up, never past the day's cap.
+ */
+export function mintFor(category: TaskType, rate: number, mintedToday: number, repeats = 0): number {
   const base = EARNING[category] ?? 0;
   const r = Number.isFinite(rate) ? Math.min(1, Math.max(0, rate)) : 0;
-  return Math.max(0, Math.min(Math.round(base * r), DAILY_MINT_CAP - mintedToday));
+  const raw = Math.round(((base * r * repeatPercent(repeats)) / 100) * 1e6) / 1e6; // float noise before half-up
+  return Math.max(0, Math.min(Math.round(raw), DAILY_MINT_CAP - mintedToday));
 }
 
 /**

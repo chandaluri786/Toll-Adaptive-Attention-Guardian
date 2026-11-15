@@ -1,6 +1,7 @@
 // OWNER: C (task C7). The logic behind Settings' weather thresholds (design 7.1, 7.3): stepping a
 // threshold through weatherConfig's validation, the Focus Pressure meter, and the design's copy.
 // Kept out of React so it is tested directly; EngineSection only renders it.
+import { LATE_NIGHT_FROM_HOUR, LATE_NIGHT_MULTIPLIER, REPEAT_PERCENT } from '../ledger/economy';
 import { createMemoryKV } from './kv';
 import { createWeatherConfig, validateWeather, type WeatherConfig, type WeatherConfigStore, type WeatherResult } from './weatherConfig';
 
@@ -52,6 +53,24 @@ export function formatDuration(min: number): string {
 export function thresholdSummary(config: WeatherConfig, freeMinPerDay: number): string {
   return `Cloudy at pressure ${config.cloudyAt} · ${formatDuration(freeMinPerDay)} free`;
 }
+
+export type FixedRow = { title: string; subtitle: string; right: string };
+
+const paidPercents = REPEAT_PERCENT.filter((p) => p > 0).map((p) => `${p}%`).join(' · ');
+
+/** C11: the two "should ship" economy rules as read-only Settings rows, built from the ledger's numbers. */
+export const ECONOMY_ROWS: readonly FixedRow[] = [
+  {
+    title: 'Same kind of quest again',
+    subtitle: 'Pays less each time in one day, then nothing',
+    right: paidPercents,
+  },
+  {
+    title: 'Late-night umbrella',
+    subtitle: `From ${String(LATE_NIGHT_FROM_HOUR).padStart(2, '0')}:00 until the new day`,
+    right: `${LATE_NIGHT_MULTIPLIER}× cost`,
+  },
+];
 
 let practice: WeatherConfigStore | null = null;
 
