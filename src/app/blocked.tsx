@@ -5,6 +5,6 @@ import { useLocalSearchParams } from 'expo-router';
 import StormScreen from '../device/screens/StormScreen';
 
 export default function Blocked() {
-  const { app, reason } = useLocalSearchParams<{ app?: string; package?: string; reason?: string }>();
-  return <StormScreen appName={app} reason={reason} />;
+  const { app, package: pkg, reason, weather, balance } = useLocalSearchParams<{ app?: string; package?: string; reason?: string; weather?: string; balance?: string }>();
+  return <StormScreen appName={app} pkg={pkg} reason={reason} weather={weather} balance={balance} />;
 }

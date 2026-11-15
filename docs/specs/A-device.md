@@ -19,6 +19,10 @@ When A is done, a user can:
 
 A also owns the look (`src/ui/`): weather theme tokens, weather names and shared components.
 
+## Status (end of Spec A)
+
+Done and unit tested: A1 to A5 logic, A10 notifications, A11/A13 forecast model, A6 to A7 screens, A12 design system. Written but **untested on a phone**: the real adapters in `src/device/native/`. Findings: `expo-app-blocker` exposes no foreground stream (handled by the unlock-budget meter), and screen on/off and background location are not available (see `src/device/native/signals.ts`). Preview: `npm run web`, open `/gallery`.
+
 ## Owns
 
 | Path | What |

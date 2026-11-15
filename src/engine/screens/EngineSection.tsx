@@ -33,7 +33,7 @@ function PressureCard({ config }: { config: WeatherConfig }) {
           </Text>
         </View>
         <View style={{ height: BAR_HEIGHT, borderRadius: BAR_HEIGHT / 2, backgroundColor: t.border }}>
-          <View style={{ width: `${m.fillPct}%`, height: BAR_HEIGHT, borderRadius: BAR_HEIGHT / 2, backgroundColor: t.cloudy.sun }} />
+          <View style={{ width: `${m.fillPct}%`, height: BAR_HEIGHT, borderRadius: BAR_HEIGHT / 2, backgroundColor: t.cloud }} />
           {mark(m.cloudyPct)}
           {mark(m.stormPct)}
         </View>

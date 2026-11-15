@@ -1,22 +1,14 @@
-// OWNER: A (Spec A — tasks A11 week view, A13 month / 6 months). Reads Ledger.history() only;
-// everything is computed on the phone.
-import React, { useMemo } from 'react';
-import { Text } from 'react-native';
+// OWNER: A (Spec A, tasks A11, A13). The connected Forecast tab: asks the ledger for as much history as
+// the chosen range needs (the range plus the period it is compared with), builds the model, draws it.
+import React, { useMemo, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import services from '../../services';
-import { Placeholder, useTheme } from '../../ui/components';
+import { forecastModel, historyNeeded, type Range } from '../forecast';
+import { ForecastView } from './ForecastView';
 
 export default function ForecastScreen() {
-  const t = useTheme();
-  const week = useMemo(() => services.ledger.history(7), []);
-  return (
-    <Placeholder title="Forecast" owner="A" tasks="A11, A13">
-      <Text style={{ color: t.textMuted }}>How the weather's been treating you — last 7 days (fake history)</Text>
-      {week.map((d) => (
-        <Text key={d.date} style={{ color: t.text }}>
-          {d.date} · {d.restrictedMin} min distracting · {d.pastFreeMin} past free time ·{' '}
-          {d.tasksPlanned === null ? `no plan, ${d.tasksDone} done` : `${d.tasksDone}/${d.tasksPlanned} tasks`}
-        </Text>
-      ))}
-    </Placeholder>
-  );
+  const [range, setRange] = useState<Range>('week');
+  const insets = useSafeAreaInsets();
+  const model = useMemo(() => forecastModel(range, services.ledger.history(historyNeeded(range))), [range]);
+  return <ForecastView model={model} range={range} onRange={setRange} topInset={insets.top} />;
 }
