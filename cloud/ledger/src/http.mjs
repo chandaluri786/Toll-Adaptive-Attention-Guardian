@@ -1,5 +1,5 @@
 // HTTP API (payload v2) routing. Pure apart from the injected stores, clock and log.
-import { parseClaimRequest, parseEventBatch, parsePairRequest, parseWalletId } from './validate.mjs';
+import { parseClaimRequest, parseEventBatch, parseIdPrefix, parsePairRequest, parseWalletId } from './validate.mjs';
 import { createLedgerService } from './ledger.mjs';
 import { createPairingService } from './pairing.mjs';
 
@@ -23,6 +23,13 @@ export const createRouter = ({ store, pairStore, now = () => Date.now(), log = c
       const batch = parseEventBatch(bodyOf(event));
       if (!batch.ok) return respond(400, { error: batch.error });
       return respond(200, await ledger.postEvents(batch.events));
+    },
+    'GET /events': async (event) => {
+      const wallet = parseWalletId(event.queryStringParameters?.walletId);
+      if (!wallet.ok) return respond(400, { error: wallet.error });
+      const prefix = parseIdPrefix(event.queryStringParameters?.prefix);
+      if (!prefix.ok) return respond(400, { error: prefix.error });
+      return respond(200, { walletId: wallet.walletId, events: await ledger.eventsFor(wallet.walletId, prefix.prefix) });
     },
     'GET /balance': async (event) => {
       const wallet = parseWalletId(event.queryStringParameters?.walletId);

@@ -11,6 +11,9 @@
   phone must strip events to these four fields before syncing.
 - `GET /balance?walletId=<uuid>` → `200 { "walletId", "balanceMinutes" }` = sum of all deltas (0 for an unknown wallet).
   The phone's ledger closes each day with a `reset` event, so this sum equals the phone's balance once it has synced.
+- `GET /events?walletId=<uuid>[&prefix=ext-]` → `200 { "walletId", "events": [{ "id", "deltaMinutes", "at" }] }`, the
+  wallet's events whose id starts with `prefix` (a `begins_with` on the sort key, so only those rows are read). The phone pulls
+  `ext-` events: **any client other than the phone must give its event ids the `ext-` prefix** so the phone merges them.
 - `POST /pair` — body exactly `{ "walletId": "<uuid>" }` → `200 { "code": "123456", "expiresAt": <epoch seconds> }`.
   A random 6-digit code valid **5 minutes**, stored with `attribute_not_exists(code)` and retried (up to 5 times) on a clash.
 - `POST /pair/claim` — body exactly `{ "code": "123456" }` → `200 { "walletId" }` and the code is deleted (works **once**).

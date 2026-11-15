@@ -15,6 +15,14 @@ export const parseWalletId = (value) =>
     ? { ok: true, walletId: value }
     : fail('walletId must be a UUID');
 
+/** Optional `prefix` query parameter for GET /events: absent means every event. */
+export const parseIdPrefix = (value) => {
+  if (value === undefined) return { ok: true, prefix: '' };
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH && ID_PATTERN.test(value)
+    ? { ok: true, prefix: value }
+    : fail(`prefix must be 1-${MAX_ID_LENGTH} characters of A-Z a-z 0-9 . _ : -`);
+};
+
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const checkEvent = (raw, index) => {

@@ -54,3 +54,14 @@ test('an unknown wallet has balance 0', async () => {
   const ledger = createLedgerService(createMemoryStore());
   assert.equal(await ledger.balance(W2), 0);
 });
+
+test('eventsFor lists one wallet\'s events as { id, deltaMinutes, at }, optionally by id prefix', async () => {
+  const ledger = createLedgerService(createMemoryStore());
+  await ledger.postEvents([ev('ext-1', -5), ev('quest-a', 25), ev('ext-2', -3, W2)]);
+
+  const all = await ledger.eventsFor(W1);
+  const ext = await ledger.eventsFor(W1, 'ext-');
+
+  assert.deepEqual(all.map((e) => e.id).sort(), ['ext-1', 'quest-a']);
+  assert.deepEqual(ext, [{ id: 'ext-1', deltaMinutes: -5, at: 1763145600000 }]);
+});

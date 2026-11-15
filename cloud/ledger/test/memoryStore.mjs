@@ -9,6 +9,11 @@ export const createMemoryStore = () => {
       rows.set(key, { ...row });
       return true;
     },
+    async eventsFor(walletId, prefix = '') {
+      return [...rows.values()]
+        .filter((r) => r.walletId === walletId && r.eventId.startsWith(prefix))
+        .map(({ eventId, deltaMinutes, at }) => ({ id: eventId, deltaMinutes, at }));
+    },
     async deltasFor(walletId) {
       return [...rows.values()].filter((r) => r.walletId === walletId).map((r) => r.deltaMinutes);
     },

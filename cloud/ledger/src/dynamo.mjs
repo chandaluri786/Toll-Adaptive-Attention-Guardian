@@ -23,6 +23,29 @@ export const createDynamoStore = ({ tableName, client = new DynamoDBClient({}) }
     }
   },
 
+  /** Events whose eventId starts with `prefix` (begins_with on the sort key, so only those rows are read). */
+  async eventsFor(walletId, prefix = '') {
+    const events = [];
+    let startKey;
+    do {
+      const page = await client.send(
+        new QueryCommand({
+          TableName: tableName,
+          KeyConditionExpression: prefix ? 'walletId = :w AND begins_with(eventId, :p)' : 'walletId = :w',
+          ExpressionAttributeValues: prefix ? { ':w': { S: walletId }, ':p': { S: prefix } } : { ':w': { S: walletId } },
+          ProjectionExpression: 'eventId, deltaMinutes, #at',
+          ExpressionAttributeNames: { '#at': 'at' },
+          ExclusiveStartKey: startKey,
+        }),
+      );
+      for (const item of page.Items ?? []) {
+        events.push({ id: item.eventId.S, deltaMinutes: Number(item.deltaMinutes.N), at: Number(item.at.N) });
+      }
+      startKey = page.LastEvaluatedKey;
+    } while (startKey);
+    return events;
+  },
+
   async deltasFor(walletId) {
     const deltas = [];
     let startKey;

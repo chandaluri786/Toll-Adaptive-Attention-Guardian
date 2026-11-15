@@ -97,3 +97,21 @@ test('a store failure is a 500 with a generic message, details only in the log',
   assert.doesNotMatch(res.body, /secret/);
   assert.equal(logged.length, 1);
 });
+
+test('GET /events lists a wallet\'s events by prefix; bad input is a 400', async () => {
+  const route = createRouter({ store: createMemoryStore(), log: silent });
+  await route(post([
+    { id: 'ext-1', walletId: WALLET, deltaMinutes: -5, at: 1 },
+    { id: 'spend-1', walletId: WALLET, deltaMinutes: -2, at: 2 },
+  ]));
+  const list = (q) => route({ routeKey: 'GET /events', queryStringParameters: q });
+
+  const ext = await list({ walletId: WALLET, prefix: 'ext-' });
+
+  assert.equal(ext.statusCode, 200);
+  assert.deepEqual(json(ext), { walletId: WALLET, events: [{ id: 'ext-1', deltaMinutes: -5, at: 1 }] });
+  assert.equal(json(await list({ walletId: WALLET })).events.length, 2);
+  assert.equal((await list({ walletId: 'nope' })).statusCode, 400);
+  assert.equal((await list({ walletId: WALLET, prefix: 'a b' })).statusCode, 400);
+  assert.equal((await list(undefined)).statusCode, 400);
+});

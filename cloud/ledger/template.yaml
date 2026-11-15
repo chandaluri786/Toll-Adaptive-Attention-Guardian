@@ -62,6 +62,7 @@ Resources:
         - DynamoDBCrudPolicy: { TableName: !Ref PairTable }
       Events:
         PostEvents: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /events, Method: post } }
+        GetEvents: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /events, Method: get } }
         GetBalance: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /balance, Method: get } }
         Pair: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /pair, Method: post } }
         Claim: { Type: HttpApi, Properties: { ApiId: !Ref LedgerHttpApi, Path: /pair/claim, Method: post } }

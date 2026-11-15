@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseEventBatch, parseWalletId, MAX_BATCH } from '../src/validate.mjs';
+import { parseEventBatch, parseWalletId, parseIdPrefix, MAX_BATCH } from '../src/validate.mjs';
 
 const WALLET = '3f1c2b9e-8a7d-4c6b-9e5f-1a2b3c4d5e6f';
 const ev = (over = {}) => ({ id: 'quest-q_8f2a', walletId: WALLET, deltaMinutes: 25, at: 1763145600000, ...over });
@@ -64,4 +64,12 @@ test('parseWalletId accepts a UUID and rejects anything else', () => {
   assert.deepEqual(parseWalletId(WALLET), { ok: true, walletId: WALLET });
   assert.equal(parseWalletId(WALLET.toUpperCase()).ok, true);
   for (const bad of [undefined, '', 'abc', `${WALLET} `]) assert.equal(parseWalletId(bad).ok, false);
+});
+
+test('parseIdPrefix accepts nothing or a short id-safe prefix', () => {
+  assert.deepEqual(parseIdPrefix(undefined), { ok: true, prefix: '' });
+  assert.deepEqual(parseIdPrefix('ext-'), { ok: true, prefix: 'ext-' });
+  assert.equal(parseIdPrefix('has space').ok, false);
+  assert.equal(parseIdPrefix('x'.repeat(129)).ok, false);
+  assert.equal(parseIdPrefix('').ok, false);
 });
