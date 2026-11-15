@@ -12,6 +12,7 @@ import { createFakePostureSource } from '../../engine/fakes';
 import { createEmitter, MIN } from '../../shared/emitter';
 import { createMemoryKV, type KV } from '../kv';
 import { createRealLedger, type RealLedgerDeps } from '../real';
+import { dayKey } from '../time';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).getTime();
 
@@ -608,5 +609,81 @@ describe('history only covers days since the ledger began (A-phone-test bug 3)',
     h.setNow(at(15, 9));
     h.debug.reset();
     expect(h.ledger.history(14).map((d) => d.date)).toEqual(['2026-11-15']);
+  });
+});
+
+describe('absorb: spends made elsewhere (C9 pull-back)', () => {
+  it('a laptop spend lowers today\'s balance and is not a phone window', () => {
+    // Arrange
+    const h = harness(at(15, 14));
+    h.ledger.credit({ category: 'fitness', questId: 'q1', rate: 1 });
+    const before = h.ledger.balance();
+
+    // Act
+    const added = h.absorb([{ id: 'ext-a', deltaMinutes: -10, at: at(15, 13) }]);
+
+    // Assert
+    expect(added).toBe(1);
+    expect(h.ledger.balance()).toBe(before - 10);
+    expect(h.ledger.activeWindows()).toEqual([]);
+    expect(h.debug.events().find((e) => e.id === 'ext-a')).toMatchObject({ category: 'spend', deltaMinutes: -10 });
+  });
+
+  it('the same id twice, or one the phone already has, is absorbed once', () => {
+    const h = harness(at(15, 14));
+    h.ledger.credit({ category: 'fitness', questId: 'q1', rate: 1 });
+
+    h.absorb([{ id: 'ext-a', deltaMinutes: -5, at: at(15, 13) }, { id: 'ext-a', deltaMinutes: -5, at: at(15, 13) }]);
+    const again = h.absorb([{ id: 'ext-a', deltaMinutes: -5, at: at(15, 13) }, { id: 'quest-q1', deltaMinutes: -1, at: 1 }]);
+
+    expect(again).toBe(0);
+    expect(h.debug.events().filter((e) => e.id === 'ext-a')).toHaveLength(1);
+  });
+
+  it('ignores credits, fractions and events older than the 180 kept days', () => {
+    const h = harness(at(15, 14));
+
+    const added = h.absorb([
+      { id: 'ext-plus', deltaMinutes: 50, at: at(15, 13) },
+      { id: 'ext-frac', deltaMinutes: -1.5, at: at(15, 13) },
+      { id: 'ext-old', deltaMinutes: -5, at: new Date(2025, 0, 1, 12).getTime() },
+    ]);
+
+    expect(added).toBe(0);
+    expect(h.debug.events()).toEqual([]);
+  });
+
+  it('a spend on a past day is closed by that day\'s reset, so every past day still sums to 0', () => {
+    const h = harness(at(15, 14));
+    h.ledger.credit({ category: 'fitness', questId: 'q1', rate: 1 });
+    const today = h.ledger.balance();
+
+    h.absorb([{ id: 'ext-yday', deltaMinutes: -7, at: at(14, 20) }]);
+
+    expect(h.ledger.balance()).toBe(today);
+    const yday = h.debug.events().filter((e) => dayKey(e.at) === '2026-11-14');
+    expect(yday.reduce((n, e) => n + e.deltaMinutes, 0)).toBe(0);
+  });
+
+  it('a spend dated after the phone clock counts now (demo clock behind the laptop)', () => {
+    const h = harness(at(15, 14));
+    h.ledger.credit({ category: 'fitness', questId: 'q1', rate: 1 });
+    const before = h.ledger.balance();
+
+    h.absorb([{ id: 'ext-future', deltaMinutes: -4, at: at(16, 10) }]);
+
+    expect(h.ledger.balance()).toBe(before - 4);
+    expect(h.debug.events().find((e) => e.id === 'ext-future')?.at).toBe(at(15, 14));
+  });
+
+  it('fires onChange once when something was absorbed, never when nothing was', () => {
+    const h = harness(at(15, 14));
+    const seen: number[] = [];
+    h.ledger.onChange(() => seen.push(1));
+
+    h.absorb([]);
+    h.absorb([{ id: 'ext-a', deltaMinutes: -1, at: at(15, 13) }]);
+
+    expect(seen).toHaveLength(1);
   });
 });

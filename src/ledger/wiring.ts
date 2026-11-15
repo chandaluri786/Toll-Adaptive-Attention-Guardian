@@ -65,6 +65,7 @@ export function wireLedger(
     randomBytes: cloudOptions.randomBytes,
     now: () => get().clock.now(),
     events: () => real.debug.events(),
+    absorb: (pulled) => real.absorb(pulled),
   });
   let started = false;
   let unsubs: Unsub[] = [];

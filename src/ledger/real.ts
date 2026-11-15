@@ -120,6 +120,28 @@ export function createRealLedger({
     changes.emit();
   };
 
+  /**
+   * C9 pull-back: spends made off the phone (a laptop), already on the server. Unknown ids only, whole
+   * negative minutes only, within the kept days; dated no later than now. Past days get closed by settle().
+   */
+  const absorb = (incoming: readonly { id: string; deltaMinutes: number; at: number }[]): number => {
+    const t = now();
+    const oldest = lastDays(t, HISTORY_DAYS)[0];
+    const known = new Set(events.map((e) => e.id));
+    const added: LedgerEvent[] = [];
+    for (const e of incoming) {
+      const isSpend = Number.isInteger(e.deltaMinutes) && e.deltaMinutes < 0 && Number.isFinite(e.at);
+      if (!isSpend || known.has(e.id) || dayKey(e.at) < oldest) continue;
+      known.add(e.id);
+      added.push({ id: e.id, at: Math.min(e.at, t), deltaMinutes: e.deltaMinutes, category: 'spend' });
+    }
+    if (added.length === 0) return 0;
+    events = [...events, ...added].sort((a, b) => a.at - b.at);
+    settle();
+    commit();
+    return added.length;
+  };
+
   const ledger: Ledger = {
     balance: () => balanceOn(events, settle()),
     spend(minutes, scope): SpendResult {
@@ -221,5 +243,5 @@ export function createRealLedger({
     stopEmergency = null;
   };
 
-  return { services: { ledger }, debug, start, stop };
+  return { services: { ledger }, debug, absorb, start, stop };
 }

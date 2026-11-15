@@ -1,6 +1,6 @@
 // OWNER: C (task C9). Offline queue sync and pairing against a fake server: jest never touches the network.
 import type { LedgerEvent } from '../../contracts';
-import { createLedgerCloud, SYNC_BATCH, RETRY_MS, SYNCED_KEY, toWire, type FetchLike } from '../cloud';
+import { createLedgerCloud, PULL_PREFIX, SYNC_BATCH, RETRY_MS, SYNCED_KEY, toWire, type FetchLike } from '../cloud';
 import { createMemoryKV, type KV } from '../kv';
 
 const URL = 'https://ledger.example';
@@ -12,13 +12,17 @@ type Call = { url: string; method: string; body: unknown };
 function fakeServer() {
   const rows = new Map<string, number>();
   const calls: Call[] = [];
+  const pulls: string[] = [];
   let down = false;
   const codes = new Map<string, string>();
+  const remote: { id: string; deltaMinutes: number; at: number }[] = [];
   const fetch: FetchLike = async (url, init) => {
-    const body = JSON.parse(init.body);
-    calls.push({ url, method: init.method, body });
+    const body = init.body === undefined ? undefined : JSON.parse(init.body);
+    if (init.method === 'GET') pulls.push(url);
+    else calls.push({ url, method: init.method, body });
     if (down) throw new Error('network down');
     const reply = (status: number, payload: unknown) => ({ ok: status < 300, status, json: async () => payload });
+    if (init.method === 'GET') return reply(200, { events: remote });
     if (url === `${URL}/events`) {
       const events = body.events as Record<string, unknown>[];
       if (events.length > 100 || events.some((e) => Object.keys(e).sort().join() !== 'at,deltaMinutes,id,walletId')) {
@@ -43,6 +47,8 @@ function fakeServer() {
   return {
     fetch,
     calls,
+    pulls,
+    remote,
     rows,
     codes,
     balance: () => [...rows.values()].reduce((a, b) => a + b, 0),
@@ -61,6 +67,7 @@ const ev = (id: string, deltaMinutes: number, extra: Partial<LedgerEvent> = {}):
 function setup(opts: { events?: LedgerEvent[]; kv?: KV; baseUrl?: string | null } = {}) {
   let events: LedgerEvent[] = opts.events ?? [];
   let now = T0;
+  const absorbed: { id: string; deltaMinutes: number; at: number }[] = [];
   const server = fakeServer();
   const kv = opts.kv ?? createMemoryKV();
   const cloud = createLedgerCloud({
@@ -69,12 +76,20 @@ function setup(opts: { events?: LedgerEvent[]; kv?: KV; baseUrl?: string | null 
     fetch: server.fetch,
     now: () => now,
     events: () => events,
+    absorb: (incoming) => {
+      const known = new Set(events.map((e) => e.id));
+      const fresh = incoming.filter((e) => !known.has(e.id));
+      absorbed.push(...fresh);
+      events = [...events, ...fresh.map((e) => ({ ...e, category: 'spend' as const }))];
+      return fresh.length;
+    },
     randomBytes: () => new Uint8Array(16).fill(0x5a),
   });
   return {
     cloud,
     server,
     kv,
+    absorbed,
     setEvents: (e: LedgerEvent[]) => (events = e),
     advance: (ms: number) => (now += ms),
   };
@@ -98,8 +113,8 @@ describe('sync', () => {
     const second = await h.cloud.sync();
 
     // Assert
-    expect(first).toEqual({ status: 'synced', sent: 2 });
-    expect(second).toEqual({ status: 'synced', sent: 0 });
+    expect(first).toEqual({ status: 'synced', sent: 2, received: 0 });
+    expect(second).toEqual({ status: 'synced', sent: 0, received: 0 });
     expect(h.server.calls).toHaveLength(1);
     expect(h.server.balance()).toBe(20);
     expect(h.cloud.pending()).toEqual([]);
@@ -113,7 +128,7 @@ describe('sync', () => {
     const result = await h.cloud.sync();
 
     expect(SYNC_BATCH).toBe(100);
-    expect(result).toEqual({ status: 'synced', sent: 205 });
+    expect(result).toEqual({ status: 'synced', sent: 205, received: 0 });
     expect(h.server.calls.map((c) => (c.body as { events: unknown[] }).events.length)).toEqual([100, 100, 5]);
   });
 
@@ -126,8 +141,8 @@ describe('sync', () => {
     h.setEvents([ev('spend-1', -5), ev('spend-2', -3)]);
     const online = await h.cloud.sync();
 
-    expect(offline).toEqual({ status: 'waiting', sent: 0 });
-    expect(online).toEqual({ status: 'synced', sent: 2 });
+    expect(offline).toEqual({ status: 'waiting', sent: 0, received: 0 });
+    expect(online).toEqual({ status: 'synced', sent: 2, received: 0 });
     expect(h.server.balance()).toBe(-8);
   });
 
@@ -158,7 +173,7 @@ describe('sync', () => {
     const rejecting: FetchLike = async () => ({ ok: false, status: 500, json: async () => ({}) });
     const cloud = createLedgerCloud({ kv: h.kv, baseUrl: URL, fetch: rejecting, now: () => T0, events: () => [ev('spend-1', -5)] });
 
-    await expect(cloud.sync()).resolves.toEqual({ status: 'waiting', sent: 0 });
+    await expect(cloud.sync()).resolves.toEqual({ status: 'waiting', sent: 0, received: 0 });
     expect(cloud.pending()).toHaveLength(1);
   });
 
@@ -167,7 +182,7 @@ describe('sync', () => {
 
     const result = await h.cloud.sync();
 
-    expect(result).toEqual({ status: 'synced', sent: 1 });
+    expect(result).toEqual({ status: 'synced', sent: 1, received: 0 });
     expect(h.server.balance()).toBe(-5);
   });
 
@@ -188,7 +203,7 @@ describe('sync', () => {
   it('is off when no URL is configured: nothing is sent', async () => {
     const h = setup({ events: [ev('spend-1', -5)], baseUrl: null });
 
-    expect(await h.cloud.sync()).toEqual({ status: 'off', sent: 0 });
+    expect(await h.cloud.sync()).toEqual({ status: 'off', sent: 0, received: 0 });
     expect(h.server.calls).toHaveLength(0);
   });
 
@@ -197,7 +212,7 @@ describe('sync', () => {
     kv.set(SYNCED_KEY, '{nope');
     const h = setup({ kv, events: [ev('spend-1', -5)] });
 
-    expect(await h.cloud.sync()).toEqual({ status: 'synced', sent: 1 });
+    expect(await h.cloud.sync()).toEqual({ status: 'synced', sent: 1, received: 0 });
   });
 });
 
@@ -218,7 +233,7 @@ describe('kick and retry', () => {
     expect(h.server.balance()).toBe(-8);
   });
 
-  it('retry waits RETRY_MS after a miss, and does nothing with an empty queue', async () => {
+  it('retry waits RETRY_MS between passes, and pulls even with nothing to send', async () => {
     const h = setup({ events: [ev('spend-1', -5)] });
     h.server.setDown(true);
     await h.cloud.sync();
@@ -236,9 +251,12 @@ describe('kick and retry', () => {
     h.cloud.retry();
     await flush();
 
+    await flush();
+
     expect(tooSoon).toBe(1);
     expect(afterWait).toBe(2);
-    expect(h.server.calls).toHaveLength(2); // queue empty: no call
+    expect(h.server.calls).toHaveLength(2); // queue empty: no POST
+    expect(h.server.pulls).toHaveLength(2); // but each pass still pulls
   });
 
   it('a kick never rejects, even when fetch throws synchronously', async () => {
@@ -253,7 +271,7 @@ describe('kick and retry', () => {
     });
 
     expect(() => cloud.kick()).not.toThrow();
-    await expect(cloud.sync()).resolves.toEqual({ status: 'waiting', sent: 0 });
+    await expect(cloud.sync()).resolves.toEqual({ status: 'waiting', sent: 0, received: 0 });
   });
 });
 
@@ -290,5 +308,58 @@ describe('pairing', () => {
     expect(h.kv.getString(SYNCED_KEY)).toBeUndefined();
     expect(h.cloud.pending()).toHaveLength(1);
     expect(h.cloud.walletId()).toBe(before); // same fixed random bytes in this harness
+  });
+});
+
+describe('pull-back', () => {
+  it('pulls ext- events for this wallet after pushing, absorbs them, and never sends them back', async () => {
+    // Arrange
+    const h = setup({ events: [ev('spend-1', -5)] });
+    h.server.remote.push({ id: 'ext-a', deltaMinutes: -10, at: T0 });
+
+    // Act
+    const result = await h.cloud.sync();
+    await h.cloud.sync();
+
+    // Assert
+    expect(result).toEqual({ status: 'synced', sent: 1, received: 1 });
+    expect(h.server.pulls[0]).toBe(`${URL}/events?walletId=${h.cloud.walletId()}&prefix=${PULL_PREFIX}`);
+    expect(h.absorbed.map((e) => e.id)).toEqual(['ext-a']);
+    expect(h.cloud.pending()).toEqual([]);
+    const posted = h.server.calls.flatMap((c) => (c.body as { events: { id: string }[] }).events.map((e) => e.id));
+    expect(posted).toEqual(['spend-1']);
+  });
+
+  it('a malformed pull reply is ignored and keeps the pass waiting', async () => {
+    const h = setup();
+    const garbled: FetchLike = async (_url, init) =>
+      init.method === 'GET'
+        ? { ok: true, status: 200, json: async () => ({ events: 'nope' }) }
+        : { ok: true, status: 200, json: async () => ({}) };
+    const cloud = createLedgerCloud({ kv: h.kv, baseUrl: URL, fetch: garbled, now: () => T0, events: () => [], absorb: () => 1 });
+
+    expect(await cloud.sync()).toEqual({ status: 'waiting', sent: 0, received: 0 });
+  });
+
+  it('drops malformed entries from an otherwise good reply', async () => {
+    const h = setup();
+    h.server.remote.push(
+      { id: 'ext-ok', deltaMinutes: -2, at: T0 },
+      { id: 7, deltaMinutes: -2, at: T0 } as unknown as { id: string; deltaMinutes: number; at: number },
+    );
+
+    const result = await h.cloud.sync();
+
+    expect(result.received).toBe(1);
+    expect(h.absorbed.map((e) => e.id)).toEqual(['ext-ok']);
+  });
+
+  it('without an absorb hook it pushes only', async () => {
+    const server = fakeServer();
+    const cloud = createLedgerCloud({ kv: createMemoryKV(), baseUrl: URL, fetch: server.fetch, now: () => T0, events: () => [] });
+
+    await cloud.sync();
+
+    expect(server.pulls).toHaveLength(0);
   });
 });
