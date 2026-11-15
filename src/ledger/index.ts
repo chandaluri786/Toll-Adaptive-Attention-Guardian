@@ -6,7 +6,7 @@ import { createMemoryKV, type KV } from './kv';
 import { wireLedger } from './wiring';
 
 /** Flip to true at integration step 1, once C5 is done. */
-export const USE_REAL = false;
+export const USE_REAL = true;
 
 export function createLedger(get: GetServices) {
   if (USE_REAL) return createRealLedger(get);

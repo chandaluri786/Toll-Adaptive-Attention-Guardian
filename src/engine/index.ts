@@ -9,7 +9,7 @@ import { createRealEngine as createRealEngineWith, type RealEngineDeps } from '.
 import type { WeatherConfigStore } from './weatherConfig';
 
 /** Flip to true at integration step 1, once C1–C4 are done. */
-export const USE_REAL = false;
+export const USE_REAL = true;
 
 /** The fake has no weather thresholds or free-time store; C's Settings and demo panel fall back when missing. */
 export type EngineModule = ReturnType<typeof createFakeEngine> & {

@@ -16,6 +16,7 @@ test('every interface in the contract is wired', () => {
 
 test('Cloudy: spending umbrella time opens a window and lowers the balance', () => {
   debug.engine.postureSource.setPosture('metered');
+  debug.ledger.setBalance(30); // S2: umbrella 30 (the real ledger starts each day at 0)
   const before = services.ledger.balance();
   const r = services.ledger.spend(15, 'restricted');
   expect(r.ok).toBe(true);
