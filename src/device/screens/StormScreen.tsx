@@ -15,8 +15,9 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import services, { device } from '../../services';
+import services, { debug, device } from '../../services';
 import { useBalance, usePosture } from '../../shared/hooks';
+import { USE_REAL } from '../index';
 import { fmtClock } from '../notifications';
 import { classify, isAllowed } from '../policy';
 import {
@@ -30,7 +31,19 @@ import {
 } from '../stormViewModel';
 import { StormView } from './StormView';
 
-export default function StormScreen({ appName, pkg, reason }: { appName?: string; pkg?: string; reason?: string }) {
+/** `?weather=` values for trying the screen in a browser (fakes only): the three weathers by their user-facing names. */
+const PREVIEW_WEATHER = { clear: 'open', cloudy: 'metered', storm: 'sealed' } as const;
+
+export default function StormScreen({ appName, pkg, reason, weather }: { appName?: string; pkg?: string; reason?: string; weather?: string }) {
+  // Browser / demo only: the fake weather lives in memory, so a page reload resets it. `?weather=storm` sets it
+  // on load so the screen can be deep-linked. Ignored when the real engine and blocker are running.
+  useEffect(() => {
+    const posture = PREVIEW_WEATHER[weather as keyof typeof PREVIEW_WEATHER];
+    if (!USE_REAL && posture) {
+      debug.engine.postureSource.setGrace(false);
+      debug.engine.postureSource.setPosture(posture);
+    }
+  }, [weather]);
   const state = usePosture();
   const balance = useBalance();
   const insets = useSafeAreaInsets();

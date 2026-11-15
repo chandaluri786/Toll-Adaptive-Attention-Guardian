@@ -28,3 +28,16 @@ Pure logic is kept out of components: `policy.ts`, `enforcer.ts`, `usageMeter.ts
 ## See it without a phone
 
 `npm run web`, then open `/gallery`: every screen and state, light and dark, built from the real logic.
+
+### Trying the live Storm / Cloud screen in the browser
+
+The fake weather lives in memory, so **reloading the page resets it to Clear skies**. Set the weather in the link instead (it is ignored on a real phone):
+
+| Link (add to `http://localhost:8081`) | What you get |
+| --- | --- |
+| `/blocked?app=Scrollr&package=com.instagram.android&weather=cloudy` | Cloudy: Wait 60 seconds, Open umbrella (30 min balance), Take a quest |
+| `/blocked?app=Scrollr&package=com.instagram.android&weather=storm` | Storm: no umbrella door, quest first |
+| `/blocked?app=Scrollr&package=com.instagram.android&weather=clear` | Clear skies |
+
+Try: **Wait 60 seconds** (countdown, filling bar, the sky settles), **Open umbrella** (the opened screen), **Emergency unlock** (tap, tap, confirm; once a day).
+
