@@ -13,11 +13,12 @@ export function formatMinSec(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** 72 → "1 h 12 m", 40 → "40 m". */
+/** 72 → "1 h 12 m", 120 → "2 h", 40 → "40 m". */
 export function formatHoursMin(minutes: number): string {
   const m = Math.max(0, Math.floor(minutes));
   const h = Math.floor(m / 60);
-  return h > 0 ? `${h} h ${m % 60} m` : `${m} m`;
+  if (h === 0) return `${m} m`;
+  return m % 60 === 0 ? `${h} h` : `${h} h ${m % 60} m`;
 }
 
 /** A timestamp as local "HH:MM". */

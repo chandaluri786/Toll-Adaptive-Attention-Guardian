@@ -23,8 +23,8 @@ export function Card({ children, dashed, style }: { children: React.ReactNode; d
 /** A thin progress bar. `tone` picks the fill: umbrella time (gold) or free time (blue). */
 export function Bar({ fraction, tone = 'umbrella' }: { fraction: number; tone?: 'umbrella' | 'free' }) {
   const t = useTheme();
-  // DESIGN: `free` token (blue) for the free-time meter; clear.sky stands in until it ships.
-  const fill = tone === 'umbrella' ? t.umbrella : t.clear.sky;
+  // DESIGN: `free` token (blue) for the free-time meter; textMuted stands in until it ships.
+  const fill = tone === 'umbrella' ? t.umbrella : t.textMuted;
   const pct = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%` as const;
   return (
     <View style={{ height: 10, borderRadius: radius.pill, backgroundColor: t.border, overflow: 'hidden' }}>
