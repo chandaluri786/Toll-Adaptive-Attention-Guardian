@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { BackHandler, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import StormScreen from '../device/screens/StormScreen';
+import { leaveToHome } from '../device/leaveToHome';
 
 export default function Blocked() {
   const { app, package: pkg, reason, weather, balance } = useLocalSearchParams<{ app?: string; package?: string; reason?: string; weather?: string; balance?: string }>();
@@ -13,7 +14,7 @@ export default function Blocked() {
   useEffect(() => {
     if (!reason || Platform.OS !== 'android') return undefined;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      BackHandler.exitApp();
+      leaveToHome('home');
       return true;
     });
     return () => sub.remove();

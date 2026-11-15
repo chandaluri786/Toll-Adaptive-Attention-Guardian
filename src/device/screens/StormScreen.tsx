@@ -13,7 +13,8 @@
 // plus the emergency unlock (once a day, two taps and a confirm).
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { leaveToHome, type LeaveTo } from '../leaveToHome';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import services, { debug, device } from '../../services';
 import { useBalance, usePosture } from '../../shared/hooks';
@@ -59,10 +60,10 @@ export default function StormScreen({ appName, pkg, reason, weather, balance: pr
   const [step, setStep] = useState<EmergencyStep>('idle');
   const [opened, setOpened] = useState<ReturnType<typeof openedViewModel> | null>(null);
 
-  // Leave the screen. Reached from the blocker: go back to the app the user was in (finishing our
-  // activity reveals it). Reached inside Toll: just navigate back.
-  const leave = useCallback(() => {
-    if (reason && Platform.OS === 'android') BackHandler.exitApp();
+  // Leave the screen. Reached from the blocker: to the home screen (dismiss), or back to the app the user was in
+  // once a window opened ('app'); see leaveToHome. Reached inside Toll: just navigate back.
+  const leave = useCallback((to: LeaveTo = 'app') => {
+    if (reason && Platform.OS === 'android') leaveToHome(to);
     else if (router.canGoBack()) router.back();
     else router.replace('/');
   }, [reason]);
@@ -117,7 +118,7 @@ export default function StormScreen({ appName, pkg, reason, weather, balance: pr
     () =>
       services.ledger.onChange(() => {
         const now = services.clock.now();
-        if (services.ledger.activeWindows().some((w) => w.until > now && w.source === 'quest')) leave();
+        if (services.ledger.activeWindows().some((w) => w.until > now && w.source === 'quest')) leave('app');
       }),
     [leave],
   );
@@ -153,8 +154,8 @@ export default function StormScreen({ appName, pkg, reason, weather, balance: pr
       topInset={insets.top}
       onDoor={onDoor}
       onEmergency={onEmergency}
-      onOpenApp={leave}
-      onDismiss={leave}
+      onOpenApp={() => leave('app')}
+      onDismiss={() => leave('home')}
     />
   );
 }

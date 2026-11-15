@@ -59,7 +59,8 @@
         {
           "color": "#00A6A6"
         }
-      ]
+      ],
+      "./plugins/withBackgroundOnBack"
     ],
     "experiments": {
       "typedRoutes": true
