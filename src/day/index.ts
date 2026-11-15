@@ -4,12 +4,16 @@ import type { GetServices } from '../contracts';
 import { createFakeDay } from './fakes';
 import { createMemoryKV } from './kv';
 import { createPlannerStore } from './planner';
+import type { QuestEngine } from './quests';
 import { createRealDay as createRealDayWith, type RealDayDeps } from './real';
 
 /** Flip to true at integration step 3, once B1–B3 are done. */
 export const USE_REAL = false;
 
-export function createDay(get: GetServices) {
+/** The fake has no engine; B's sheets fall back to placeholders when `engine` is missing. */
+export type DayModule = ReturnType<typeof createFakeDay> & { engine?: () => QuestEngine };
+
+export function createDay(get: GetServices): DayModule {
   if (USE_REAL) return createRealDay(get);
   return createFakeDay(get);
 }
@@ -36,6 +40,6 @@ function jestDeps(get: GetServices): RealDayDeps {
 
 const isJest = () => typeof process !== 'undefined' && process.env?.JEST_WORKER_ID != null;
 
-function createRealDay(get: GetServices): ReturnType<typeof createFakeDay> {
+function createRealDay(get: GetServices): DayModule {
   return createRealDayWith(get, isJest() ? jestDeps(get) : nativeDeps);
 }

@@ -124,5 +124,8 @@ export function createRealDay(get: GetServices, deps: RealDayDeps) {
     },
   };
 
-  return { services: { planner, quests }, debug };
+  /** The quest engine itself, for B's sheets (meetup capture now, B8's full sheet later). */
+  const engine = () => use().engine;
+
+  return { services: { planner, quests }, debug, engine };
 }

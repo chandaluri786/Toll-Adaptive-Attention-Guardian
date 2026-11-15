@@ -32,13 +32,13 @@ function setup(opts: { start?: number } = {}) {
 const sorted = (o: object) => Object.keys(o).sort();
 
 describe('createRealDay', () => {
-  test('has the same shape as the fake day', () => {
+  test('has the same shape as the fake day, plus the engine for B\'s sheets', () => {
     // Arrange
     const { day } = setup();
     const fake = createFakeDay(() => ({}) as Services);
 
     // Assert
-    expect(sorted(day)).toEqual(sorted(fake));
+    expect(sorted(day)).toEqual([...sorted(fake), 'engine'].sort());
     expect(sorted(day.services)).toEqual(sorted(fake.services));
     expect(sorted(day.services.planner)).toEqual(sorted(fake.services.planner));
     expect(sorted(day.services.quests)).toEqual(sorted(fake.services.quests));
@@ -221,5 +221,20 @@ describe('createRealDay', () => {
     // Assert
     expect(fn).toHaveBeenCalled();
     expect(day.services.planner.planSet()).toBe(false);
+  });
+
+  test('engine() exposes the live meetup quest and its code for the capture flow', () => {
+    // Arrange
+    const { day } = setup();
+    day.debug.seed('demo_2pm');
+    const q = day.debug.accept('meetup');
+
+    // Act
+    const engine = day.engine();
+    const progress = engine.progress(q.id);
+
+    // Assert
+    expect(engine.active().map((x) => x.id)).toContain(q.id);
+    expect(progress?.code).toHaveLength(3);
   });
 });
