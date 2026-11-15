@@ -8,10 +8,13 @@ import { createFakeDevice } from './fakes';
  * Flip to true at integration step 2, once A2, A3 and A9 work on the demo phone.
  * false = everything runs on fakes (tests, the browser preview, and any phone before integration).
  */
-export const USE_REAL = false;
+export const USE_REAL = true;
+
+/** Jest has no native modules (expo-app-blocker and co.), so tests always run the device on fakes. */
+const isJest = () => typeof process !== 'undefined' && process.env?.JEST_WORKER_ID != null;
 
 export function createDevice(get: GetServices) {
-  if (USE_REAL) return createRealDeviceLazily(get);
+  if (USE_REAL && !isJest()) return createRealDeviceLazily(get);
   return createFakeDevice(get);
 }
 
