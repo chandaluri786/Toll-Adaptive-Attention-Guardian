@@ -8,7 +8,7 @@ import type { QuestEngine } from './quests';
 import { createRealDay as createRealDayWith, type RealDayDeps } from './real';
 
 /** Flip to true at integration step 3, once B1–B3 are done. */
-export const USE_REAL = false;
+export const USE_REAL = true;
 
 /** The fake has no engine or store; B's screens fall back to the fakes when they are missing. */
 export type DayModule = ReturnType<typeof createFakeDay> & { engine?: () => QuestEngine; plannerStore?: () => PlannerStore };
