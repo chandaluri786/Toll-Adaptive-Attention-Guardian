@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Battery,
+  CalendarDays,
   Camera,
   Check,
   ChevronRight,
@@ -19,11 +20,14 @@ import {
   Moon,
   Navigation,
   Plus,
+  Settings,
+  Signal,
   Smartphone,
   Sparkles,
   Sun,
   Umbrella,
   Users,
+  Wifi,
   X,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -32,6 +36,7 @@ import React from 'react';
 const ICONS = {
   'arrow-left': ArrowLeft,
   battery: Battery,
+  'calendar-days': CalendarDays,
   camera: Camera,
   check: Check,
   'chevron-right': ChevronRight,
@@ -48,11 +53,14 @@ const ICONS = {
   moon: Moon,
   navigation: Navigation,
   plus: Plus,
+  settings: Settings,
+  signal: Signal,
   smartphone: Smartphone,
   sparkles: Sparkles,
   sun: Sun,
   umbrella: Umbrella,
   users: Users,
+  wifi: Wifi,
   x: X,
 } satisfies Record<string, LucideIcon>;
 

@@ -2,6 +2,7 @@
 // laid out like the approved design's own gallery (numbered sections, phone frames). Open it in a browser
 // (no phone needed): `npm run web`, then go to /gallery. Everything shown is produced by the real logic
 // fed with sample data (see galleryData.ts), so what you see is what the code does.
+import { Icon } from '../../ui/Icon';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ThemeModeProvider, useTheme } from '../../ui/components';
@@ -38,7 +39,7 @@ const STATUS_BAR = 34;
 const ThemeChoiceContext = React.createContext<ThemeChoice>('both');
 
 /** Renders its children once per selected theme, each inside its own phone frame. */
-function Phone({ id, label, height = 780, status = true, lightStatus = false, children }: { id: string; label: string; height?: number; status?: boolean; /** White status text, for screens drawn over a dark sky. */ lightStatus?: boolean; children: React.ReactNode }) {
+function Phone({ id, label, height = 780, status = true, lightStatus = false, tab, children }: { id: string; /** Show the bottom tab bar with this tab active (Today / Forecast / Settings). */ tab?: TabId; label: string; height?: number; status?: boolean; /** White status text, for screens drawn over a dark sky. */ lightStatus?: boolean; children: React.ReactNode }) {
   const choice = React.useContext(ThemeChoiceContext);
   const modes: ThemeMode[] = choice === 'both' ? ['light', 'dark'] : [choice];
   return (
@@ -50,6 +51,7 @@ function Phone({ id, label, height = 780, status = true, lightStatus = false, ch
             <View style={[styles.screen, { backgroundColor: BASE[mode].bg }]}>
               <ThemeModeProvider value={mode}>{children}</ThemeModeProvider>
               {status && <StatusBar mode={mode} light={lightStatus} />}
+              {tab && <TabBar mode={mode} active={tab} />}
             </View>
           </View>
         </View>
@@ -58,11 +60,41 @@ function Phone({ id, label, height = 780, status = true, lightStatus = false, ch
   );
 }
 
+type TabId = 'today' | 'forecast' | 'settings';
+
+/** The design's bottom tab bar: Today, Forecast, Settings; the active tab sits on a soft gold pill. */
+function TabBar({ mode, active }: { mode: ThemeMode; active: TabId }) {
+  const c = BASE[mode];
+  const tabs: { id: TabId; label: string; icon: 'sun' | 'calendar-days' | 'settings' }[] = [
+    { id: 'today', label: 'Today', icon: 'sun' },
+    { id: 'forecast', label: 'Forecast', icon: 'calendar-days' },
+    { id: 'settings', label: 'Settings', icon: 'settings' },
+  ];
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 74, flexDirection: 'row', backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.divider, paddingTop: 8 }}>
+      {tabs.map((tb) => (
+        <View key={tb.id} style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+          <View style={{ width: 60, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: tb.id === active ? (mode === 'dark' ? '#2a2430' : '#ffefd9') : 'transparent' }}>
+            <Icon name={tb.icon} size={20} color={c.text} />
+          </View>
+          <Text style={{ color: c.text, fontSize: 12.5, fontFamily: tb.id === active ? fonts.medium : fonts.body }}>{tb.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** A minimal status bar so the screens sit where they would on a phone. */
 function StatusBar({ mode, light }: { mode: ThemeMode; light: boolean }) {
+  const ink = light || mode === 'dark' ? '#f2f4ff' : '#1d2130';
   return (
     <View pointerEvents="none" style={styles.statusBar}>
-      <Text style={{ color: light || mode === 'dark' ? '#f2f4ff' : '#1d2130', fontSize: 14, fontFamily: fonts.medium }}>10:14</Text>
+      <Text style={{ color: ink, fontSize: 14, fontFamily: fonts.medium }}>10:14</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <Icon name="signal" size={14} color={ink} strokeWidth={2.2} />
+        <Icon name="wifi" size={14} color={ink} strokeWidth={2.2} />
+        <Icon name="battery" size={16} color={ink} strokeWidth={2.2} />
+      </View>
     </View>
   );
 }
@@ -240,10 +272,10 @@ export default function Gallery() {
             <Segmented options={[{ id: 'week', label: 'Week' }, { id: 'month', label: 'Month' }, { id: 'six_months', label: '6 months' }] as const} value={range} onChange={setRange} />
           </View>
           <View style={{ width: '100%' }} />
-          <Phone id={`forecast-${range}`} label={`5.1 Forecast · ${range === 'six_months' ? '6 months' : range}`} height={1500}>
+          <Phone id={`forecast-${range}`} label={`5.1 Forecast · ${range === 'six_months' ? '6 months' : range}`} height={1500} tab="forecast">
             <ForecastView model={forecastSample(range)} range={range} onRange={setRange} topInset={STATUS_BAR} />
           </Phone>
-          <Phone id="forecast-empty" label="5.4 First days: empty" height={780}>
+          <Phone id="forecast-empty" label="5.4 First days: empty" height={780} tab="forecast">
             <ForecastView model={forecastEmpty()} range="week" onRange={noop} topInset={STATUS_BAR} />
           </Phone>
         </Section>
@@ -357,7 +389,7 @@ const styles = StyleSheet.create({
   caption: { fontSize: 13, color: '#6c6f7c', fontFamily: fonts.body },
   bezel: { width: 378, borderRadius: 48, padding: 9, backgroundColor: '#14141c', boxShadow: '0 18px 40px rgba(20,20,40,.22)' },
   screen: { flex: 1, borderRadius: 40, overflow: 'hidden' },
-  statusBar: { position: 'absolute', left: 0, right: 0, top: 0, height: STATUS_BAR, paddingHorizontal: 22, justifyContent: 'center' },
+  statusBar: { position: 'absolute', left: 0, right: 0, top: 0, height: STATUS_BAR, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   skyTile: { width: 260, height: 190, borderRadius: 22, overflow: 'hidden' },
   mascotCell: { width: 120, height: 130, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,.06)', alignItems: 'center', justifyContent: 'center', gap: 10 },
   notice: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 6 },

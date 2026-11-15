@@ -6,6 +6,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { DaySummary, TaskType } from '../../contracts';
 import { useTheme } from '../../ui/components';
+import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Mascot } from '../../ui/Mascot';
 import { Body, Card, Display, MiniBars, SectionLabel, Segmented } from '../../ui/primitives';
@@ -16,7 +17,7 @@ import { fmtClock } from '../notifications';
 const DAY_ICON: Record<DayIcon, { icon: IconName; label: string }> = {
   sun: { icon: 'sun', label: 'Within free time + a quest' },
   partly: { icon: 'cloud-sun', label: 'One of the two' },
-  storm: { icon: 'cloud-lightning', label: 'Neither' },
+  storm: { icon: 'cloud', label: 'Neither' },
 };
 
 const CATEGORY_LABEL: Record<TaskType, string> = {
@@ -66,7 +67,9 @@ function Empty({ model }: { model: Extract<ForecastModel, { state: 'empty' }> })
           {'MTWTFSS'.split('').map((letter, i) => (
             <View key={i} style={{ alignItems: 'center', gap: 8, flex: 1 }}>
               <Text style={{ color: t.muted, fontSize: 14, fontFamily: fonts.body }}>{letter}</Text>
-              <View style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: i === todayIndex ? t.gold : t.faint, opacity: i === todayIndex ? 1 : 0.6 }} />
+              <View style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: i === todayIndex ? t.gold : t.faint, opacity: i === todayIndex ? 1 : 0.6, alignItems: 'center', justifyContent: 'center' }}>
+                {i === todayIndex && <Icon name="sun" size={20} color={t.gold} />}
+              </View>
             </View>
           ))}
         </View>
@@ -148,7 +151,7 @@ function Ready({ model }: { model: Extract<ForecastModel, { state: 'ready' }> })
 
 function DayGlyph({ icon, size }: { icon: DayIcon; size: number }) {
   const t = useTheme();
-  const color = icon === 'sun' ? t.gold : icon === 'partly' ? t.cloud : t.storm;
+  const color = icon === 'sun' ? t.gold : icon === 'partly' ? t.free : t.muted; // design: gold sun, blue partly-sunny, plain grey cloud
   return <Icon name={DAY_ICON[icon].icon} size={size} color={color} />;
 }
 
@@ -229,13 +232,34 @@ function Calendar({ model }: { model: Extract<ForecastModel, { state: 'ready' }>
                   key={d.date}
                   accessible
                   accessibilityLabel={`${d.date}: ${DAY_ICON[icon].label}`}
-                  style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: icon === 'sun' ? t.gold : icon === 'partly' ? t.cloud : t.storm, opacity: icon === 'partly' ? 0.55 : 1 }}
+                  style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: icon === 'sun' ? t.gold : icon === 'partly' ? t.free : t.faint, opacity: icon === 'storm' ? 0.6 : 1 }}
                 />
               );
             })}
           </View>
         </View>
       ))}
+    </View>
+  );
+}
+
+/** Diagonal gold stripes: a day with no plan but quests done (as in the design). */
+function Hatched({ height, color }: { height: number; color: string }) {
+  const [w, setW] = React.useState(0);
+  const id = React.useId().replace(/:/g, '');
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ height, borderRadius: 3, overflow: 'hidden' }}>
+      {w > 0 && height > 0 && (
+        <Svg width={w} height={height}>
+          <Defs>
+            <Pattern id={id} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <Rect width={6} height={6} fill="transparent" />
+              <Rect width={3} height={6} fill={color} />
+            </Pattern>
+          </Defs>
+          <Rect width={w} height={height} fill={`url(#${id})`} />
+        </Svg>
+      )}
     </View>
   );
 }
@@ -255,7 +279,11 @@ function GoalChart({ bars }: { bars: GoalBar[] }) {
           const inner = (b.done / max) * H;
           return (
             <View key={b.date} style={{ flex: 1, height: Math.max(3, outer), justifyContent: 'flex-end', borderRadius: 4, borderWidth: b.hasPlan ? 1 : 0, borderColor: t.faint }}>
-              <View style={{ height: Math.max(0, inner), backgroundColor: t.gold, borderRadius: 3, opacity: b.hasPlan ? 1 : 0.45 }} />
+              {b.hasPlan ? (
+                <View style={{ height: Math.max(0, inner), backgroundColor: t.gold, borderRadius: 3 }} />
+              ) : (
+                <Hatched height={Math.max(0, inner)} color={t.gold} />
+              )}
             </View>
           );
         })}

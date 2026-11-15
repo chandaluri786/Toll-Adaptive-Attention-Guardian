@@ -63,7 +63,7 @@ export function OnboardingView(p: OnboardingViewProps) {
         <Pressable accessibilityRole="button" onPress={p.onNext} style={[styles.primary, { backgroundColor: t.primaryBg, borderColor: t.gold }]}>
           <Text style={{ color: t.primaryText, fontSize: 17, fontFamily: fonts.medium }}>{BUTTON[p.step]}</Text>
         </Pressable>
-        {p.step > 0 && (
+        {p.step > 1 && (
           <Text accessibilityRole="link" onPress={p.onBack} style={{ color: t.muted, fontSize: 15, fontFamily: fonts.body, textAlign: 'center', paddingVertical: 12 }}>
             Back
           </Text>
@@ -130,7 +130,7 @@ function Permissions({ status, onRequest }: { status: PermissionStatus; onReques
   return (
     <View style={styles.body}>
       <Display>A few permissions</Display>
-      <Body muted>Each one unlocks something. Skip any, and Toll still works.</Body>
+      <Body muted>Each one unlocks something. Skip any — Toll still works.</Body>
       <Card style={{ paddingVertical: 4, gap: 0 }}>
         {PERMISSIONS.map((perm, i) => {
           const on = status[perm.id];
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   mascot: { position: 'absolute', left: 160, top: 128 },
   footer: { paddingHorizontal: 22, paddingBottom: 18, paddingTop: 8 },
   primary: { minHeight: 56, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  permRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 6, minHeight: 64 },
+  permRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 6, minHeight: 56 },
   permDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5 },
   allow: { minHeight: 44, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
