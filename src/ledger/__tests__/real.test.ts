@@ -15,7 +15,9 @@ import { createRealLedger, type RealLedgerDeps } from '../real';
 
 const at = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).getTime();
 
-function harness(start: number, opts: { kv?: KV; unlocksOn?: RealLedgerDeps['unlocksOn'] } = {}) {
+type HarnessOpts = { kv?: KV } & Pick<RealLedgerDeps, 'unlocksOn' | 'emergencyWindow' | 'onEmergency'>;
+
+function harness(start: number, opts: HarnessOpts = {}) {
   let now = start;
   const ticks = createEmitter<number>();
   const clock: Clock = { now: () => now, onTick: (fn) => ticks.on(fn) };
@@ -25,7 +27,8 @@ function harness(start: number, opts: { kv?: KV; unlocksOn?: RealLedgerDeps['unl
   const device = createFakeDevice(get);
   const day = createFakeDay(get);
   const kv = opts.kv ?? createMemoryKV();
-  const made = createRealLedger({ get, kv, unlocksOn: opts.unlocksOn });
+  const { unlocksOn, emergencyWindow, onEmergency } = opts;
+  const made = createRealLedger({ get, kv, unlocksOn, emergencyWindow, onEmergency });
   Object.assign(services, { postureSource, ledger: made.services.ledger, ...device.services, ...day.services });
   return {
     ...made,
@@ -40,6 +43,14 @@ function harness(start: number, opts: { kv?: KV; unlocksOn?: RealLedgerDeps['unl
     weather: (p: Posture) => postureSource.setPosture(p),
     allowance: (min: number) => postureSource.setAllowance(min),
   };
+}
+
+/** A ledger first used at `began`, then moved to `now` (history only covers days since it began). */
+function startedOn(began: number, now: number, opts: HarnessOpts = {}) {
+  const h = harness(began, opts);
+  h.ledger.balance();
+  h.setNow(now);
+  return h;
 }
 
 const sumOf = (h: ReturnType<typeof harness>) => h.debug.events().reduce((n, e) => n + e.deltaMinutes, 0);
@@ -373,12 +384,12 @@ describe('onChange', () => {
 
 describe('history(days)', () => {
   it('returns local YYYY-MM-DD days, oldest first, ending with today (02:00 is still yesterday)', () => {
-    const h = harness(at(1, 2)); // 1 Nov 02:00 → day of 31 Oct
+    const h = startedOn(at(-2, 9), at(1, 2)); // 1 Nov 02:00 → day of 31 Oct
     expect(h.ledger.history(3).map((d) => d.date)).toEqual(['2026-10-29', '2026-10-30', '2026-10-31']);
   });
 
   it('is capped at 180 days and ignores nonsense', () => {
-    const h = harness(at(15, 9));
+    const h = startedOn(at(15 - 200, 9), at(15, 9));
     expect(h.ledger.history(500)).toHaveLength(180);
     expect(h.ledger.history(0)).toEqual([]);
     expect(h.ledger.history(-3)).toEqual([]);
@@ -405,7 +416,7 @@ describe('history(days)', () => {
 
   it('emergency unlocks come from the injected governor log', () => {
     const unlocksOn = jest.fn((date: string) => (date === '2026-11-15' ? [at(15, 8)] : []));
-    const h = harness(at(15, 9), { unlocksOn });
+    const h = startedOn(at(14, 9), at(15, 9), { unlocksOn });
     const [yesterday, today] = h.ledger.history(2);
     expect(yesterday.emergencyUnlocks).toEqual([]);
     expect(today.emergencyUnlocks).toEqual([at(15, 8)]);
@@ -433,7 +444,7 @@ describe('history(days)', () => {
   });
 
   it('a day with nothing recorded is all zeros, no plan', () => {
-    const h = harness(at(15, 9));
+    const h = startedOn(at(14, 9), at(15, 9));
     expect(h.ledger.history(2)[0]).toEqual({
       date: '2026-11-14',
       restrictedMin: 0,
@@ -501,5 +512,101 @@ describe('boundaries', () => {
       expect(src).not.toMatch(/from '\.\.\/(day|device|engine)\//);
       expect(src).not.toMatch(/Date\.now\(|\.toISOString\(/);
     }
+  });
+});
+
+describe('emergency window (A-phone-test bug 2)', () => {
+  const emergency = { id: `em-${at(15, 9)}`, scope: 'all' as const, until: at(15, 9, 15), source: 'emergency' as const };
+
+  it("activeWindows() includes the governor's live emergency window, next to bought windows", () => {
+    // Arrange
+    const h = harness(at(15, 9, 1), { emergencyWindow: () => emergency });
+    h.weather('metered');
+    h.debug.setBalance(30);
+
+    // Act
+    const bought = h.ledger.spend(15, 'restricted');
+
+    // Assert
+    expect(bought.ok).toBe(true);
+    expect(h.ledger.activeWindows()).toEqual([bought.ok ? bought.window : null, emergency]);
+  });
+
+  it('an expired emergency window is left out', () => {
+    const h = harness(at(15, 9, 15), { emergencyWindow: () => emergency });
+    expect(h.ledger.activeWindows()).toEqual([]);
+  });
+
+  it('an emergency unlock fires onChange once the ledger has started (so enforcement re-plans)', () => {
+    // Arrange
+    const uses = createEmitter<void>();
+    const h = harness(at(15, 9), { onEmergency: (fn) => uses.on(fn) });
+    const fn = jest.fn();
+    h.ledger.onChange(fn);
+
+    // Act
+    uses.emit(); // before start: not listening yet
+    h.start();
+    uses.emit();
+    h.stop();
+    uses.emit(); // after stop: unsubscribed
+
+    // Assert
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('history only covers days since the ledger began (A-phone-test bug 3)', () => {
+  it('a brand-new ledger reports just today, so Forecast can show its empty state', () => {
+    const h = harness(at(15, 9));
+    expect(h.ledger.history(14).map((d) => d.date)).toEqual(['2026-11-15']);
+  });
+
+  it('grows one day per local day, and still caps at the days asked for', () => {
+    // Arrange
+    const h = harness(at(13, 9));
+    h.ledger.balance(); // first use records the start day
+
+    // Act
+    h.setNow(at(16, 3, 59)); // still the 15th (04:00 reset)
+    const three = h.ledger.history(14).map((d) => d.date);
+    h.setNow(at(16, 4));
+    const capped = h.ledger.history(2).map((d) => d.date);
+
+    // Assert
+    expect(three).toEqual(['2026-11-13', '2026-11-14', '2026-11-15']);
+    expect(capped).toEqual(['2026-11-15', '2026-11-16']);
+  });
+
+  it('the start day is stored, so a restart keeps the history', () => {
+    // Arrange
+    const kv = createMemoryKV();
+    harness(at(13, 9), { kv }).ledger.balance();
+
+    // Act
+    const reopened = harness(at(15, 9), { kv });
+
+    // Assert
+    expect(reopened.ledger.history(14).map((d) => d.date)).toEqual(['2026-11-13', '2026-11-14', '2026-11-15']);
+  });
+
+  it('an older event moves the start back (ledgers from before this fix keep their days)', () => {
+    // Arrange: an event stored on the 12th with no start day recorded
+    const kv = createMemoryKV();
+    kv.set('events', JSON.stringify([{ id: 'quest-old', at: at(12, 9), deltaMinutes: 25, category: 'fitness' }]));
+
+    // Act
+    const h = harness(at(14, 9), { kv });
+
+    // Assert
+    expect(h.ledger.history(14)[0].date).toBe('2026-11-12');
+  });
+
+  it('reset everything starts history again from today', () => {
+    const h = harness(at(13, 9));
+    h.ledger.balance();
+    h.setNow(at(15, 9));
+    h.debug.reset();
+    expect(h.ledger.history(14).map((d) => d.date)).toEqual(['2026-11-15']);
   });
 });

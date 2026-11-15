@@ -204,6 +204,25 @@ describe('createRealEngine + wireLedger with fakes of A and B', () => {
     expect(governor.emergencyUnlock()).not.toBeNull();
   });
 
+  test('S5 enforcement: the emergency window reaches ledger.activeWindows() and fires onChange (A-phone-test bug 2)', () => {
+    // Arrange: Cloudy, nothing bought
+    const h = setup(at(15));
+    h.engine.debug.postureSource.setPosture('metered');
+    const changed = jest.fn();
+    h.services.ledger.onChange(changed);
+
+    // Act
+    const w = h.services.governor.emergencyUnlock();
+    const during = h.services.ledger.activeWindows();
+    h.wait(15 * MIN);
+    const after = h.services.ledger.activeWindows();
+
+    // Assert
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(during).toEqual([w]);
+    expect(after).toEqual([]);
+  });
+
   test('history() carries Storm minutes, Restricted minutes, emergency unlocks and plan progress', () => {
     // Arrange: Storm from 10:01:30 (shown) in Algorithms; 2 minutes of Instagram earlier
     const h = setup(at(9, 58, 30));

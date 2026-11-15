@@ -111,3 +111,57 @@ describe('createGovernor — log', () => {
     expect(governor.log()).toHaveLength(1);
   });
 });
+
+describe('createGovernor — the live emergency window (A-phone-test bug 2)', () => {
+  it('activeWindow() is the open emergency window for 15 minutes, then null', () => {
+    // Arrange
+    const { governor, setNow } = harness();
+    expect(governor.activeWindow()).toBeNull();
+
+    // Act
+    const opened = governor.emergencyUnlock();
+    setNow(at(15, 10, 14));
+    const during = governor.activeWindow();
+    setNow(at(15, 10, 15));
+    const after = governor.activeWindow();
+
+    // Assert
+    expect(during).toEqual(opened);
+    expect(after).toBeNull();
+  });
+
+  it('activeWindow() survives a restart (read from the stored log)', () => {
+    // Arrange
+    const { kv, governor } = harness();
+    governor.emergencyUnlock();
+    const clock = { now: () => at(15, 10, 5), onTick: () => () => {} };
+
+    // Act
+    const reloaded = createGovernor({ clock, kv });
+
+    // Assert
+    expect(reloaded.activeWindow()).toEqual({ id: `em-${at(15, 10)}`, scope: 'all', until: at(15, 10, 15), source: 'emergency' });
+  });
+
+  it('onUse() fires once per unlock that opens, never for a refused one', () => {
+    // Arrange
+    const { governor } = harness();
+    const seen: unknown[] = [];
+    const off = governor.onUse((w) => seen.push(w));
+
+    // Act
+    const first = governor.emergencyUnlock();
+    governor.emergencyUnlock(); // refused: already used today
+    off();
+
+    // Assert
+    expect(seen).toEqual([first]);
+  });
+
+  it('reset() clears the live window', () => {
+    const { governor } = harness();
+    governor.emergencyUnlock();
+    governor.reset();
+    expect(governor.activeWindow()).toBeNull();
+  });
+});

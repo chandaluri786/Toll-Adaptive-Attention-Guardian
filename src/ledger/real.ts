@@ -13,6 +13,7 @@ import type {
   Scope,
   Seed,
   SpendResult,
+  Unsub,
 } from '../contracts';
 import { createEmitter, MIN } from '../shared/emitter';
 import { createDayTracker, type DayTracker } from './dayTracker';
@@ -23,6 +24,8 @@ import { dayKey, lastDays } from './time';
 
 export const EVENTS_KEY = 'events';
 export const WINDOWS_KEY = 'windows';
+/** The local day this ledger began (YYYY-MM-DD). history() never reports days before it. */
+export const SINCE_KEY = 'since';
 /** Demo seeds that start with an umbrella (S2/S3: "Cloudy, umbrella 30"). */
 export const SEED_BALANCE = 30;
 const SEC_PER_MIN = 60;
@@ -34,6 +37,10 @@ export type RealLedgerDeps = {
   posture?: () => Posture;
   /** Emergency unlocks on a local day (the governor owns that log). Default: none. */
   unlocksOn?: (date: string) => number[];
+  /** The governor's live emergency window (every app, 15 min), added to activeWindows(). Default: none. */
+  emergencyWindow?: () => AccessWindow | null;
+  /** Subscribe to emergency unlocks; while started, each one fires onChange so enforcement re-plans. */
+  onEmergency?: (fn: () => void) => Unsub;
   tracker?: DayTracker;
 };
 
@@ -47,13 +54,35 @@ function parseWindows(raw: unknown): AccessWindow[] {
   );
 }
 
-export function createRealLedger({ get, kv, posture, unlocksOn = () => [], tracker }: RealLedgerDeps) {
+export function createRealLedger({
+  get,
+  kv,
+  posture,
+  unlocksOn = () => [],
+  emergencyWindow = () => null,
+  onEmergency,
+  tracker,
+}: RealLedgerDeps) {
   const changes = createEmitter<void>();
   const days = tracker ?? createDayTracker({ get, kv });
   const weather = posture ?? (() => get().postureSource.get().posture);
   const now = () => get().clock.now();
   let events: readonly LedgerEvent[] = parseEvents(readJson(kv, EVENTS_KEY));
   let windows: readonly AccessWindow[] = parseWindows(readJson(kv, WINDOWS_KEY));
+  const storedSince = readJson(kv, SINCE_KEY);
+  let since: string | null = typeof storedSince === 'string' ? storedSince : null;
+  let stopEmergency: Unsub | null = null;
+
+  /** First day of this ledger: the stored start, moved back to the oldest event (ledgers from before it was stored). */
+  const firstDay = (today: string): string => {
+    const oldestEvent = events.length ? dayKey(events[0].at) : today;
+    const first = [since ?? today, oldestEvent].sort()[0];
+    if (first !== since) {
+      since = first;
+      kv.set(SINCE_KEY, JSON.stringify(since));
+    }
+    return first;
+  };
 
   const save = () => {
     kv.set(EVENTS_KEY, JSON.stringify(events));
@@ -69,6 +98,7 @@ export function createRealLedger({ get, kv, posture, unlocksOn = () => [], track
       days.prune(oldest);
       save();
     }
+    firstDay(today);
     return today;
   };
   const append = (...added: LedgerEvent[]) => {
@@ -125,11 +155,18 @@ export function createRealLedger({ get, kv, posture, unlocksOn = () => [], track
       commit();
       return { event, window };
     },
-    activeWindows: () => windows.filter((w) => w.until > now()),
+    activeWindows: () => {
+      const t = now();
+      const emergency = emergencyWindow();
+      const live = windows.filter((w) => w.until > t);
+      return emergency && emergency.until > t ? [...live, emergency] : live;
+    },
     history(n) {
-      settle();
       const count = Math.max(0, Math.min(HISTORY_DAYS, Math.floor(Number.isFinite(n) ? n : 0)));
-      return lastDays(now(), count).map((date) => summaryOf(date));
+      const first = firstDay(settle());
+      return lastDays(now(), count)
+        .filter((date) => date >= first)
+        .map((date) => summaryOf(date));
     },
     onChange: (fn) => changes.on(() => fn()),
   };
@@ -155,6 +192,8 @@ export function createRealLedger({ get, kv, posture, unlocksOn = () => [], track
       days.reset();
       kv.remove(EVENTS_KEY);
       kv.remove(WINDOWS_KEY);
+      kv.remove(SINCE_KEY);
+      since = null;
       changes.emit();
     },
     seed(s: Seed) {
@@ -172,5 +211,15 @@ export function createRealLedger({ get, kv, posture, unlocksOn = () => [], track
     events: () => [...events],
   };
 
-  return { services: { ledger }, debug, start: () => days.start(), stop: () => days.stop() };
+  const start = () => {
+    days.start();
+    stopEmergency ??= onEmergency ? onEmergency(() => changes.emit()) : null;
+  };
+  const stop = () => {
+    days.stop();
+    stopEmergency?.();
+    stopEmergency = null;
+  };
+
+  return { services: { ledger }, debug, start, stop };
 }

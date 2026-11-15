@@ -2,8 +2,8 @@
 // back at 04:00 local. No quest, no cost, never depends on tasks, balance or history.
 // Each use is logged (timestamps under `engine:`) so the ledger's history() can report
 // DaySummary.emergencyUnlocks for Forecast.
-import type { AccessWindow, Clock, Governor } from '../contracts';
-import { MIN } from '../shared/emitter';
+import type { AccessWindow, Clock, Governor, Unsub } from '../contracts';
+import { createEmitter, MIN } from '../shared/emitter';
 import { readJson, type KV } from './kv';
 import { dayKey } from './time';
 
@@ -19,6 +19,10 @@ export type RealGovernor = Governor & {
   log(): readonly number[];
   /** Uses that fall on the local day `date` (YYYY-MM-DD, day starts 04:00). */
   unlocksOn(date: string): number[];
+  /** The emergency window still open now, or null. The ledger adds it to activeWindows() so enforcement sees it. */
+  activeWindow(): AccessWindow | null;
+  /** Fires with the new window each time an unlock opens (not for a refused one). */
+  onUse(fn: (w: AccessWindow) => void): Unsub;
   /** Debug: forget every use. */
   reset(): void;
 };
@@ -29,8 +33,11 @@ function parseLog(raw: unknown): number[] {
   return raw.filter((t): t is number => typeof t === 'number' && Number.isFinite(t)).sort((a, b) => a - b);
 }
 
+const windowFrom = (at: number): AccessWindow => ({ id: `em-${at}`, scope: 'all', until: at + EMERGENCY_MS, source: 'emergency' });
+
 export function createGovernor({ clock, kv }: GovernorDeps): RealGovernor {
   let entries: readonly number[] = parseLog(readJson(kv, EMERGENCY_KEY));
+  const uses = createEmitter<AccessWindow>();
 
   const usedToday = () => {
     const today = dayKey(clock.now());
@@ -47,11 +54,20 @@ export function createGovernor({ clock, kv }: GovernorDeps): RealGovernor {
       if (usedToday()) return null;
       const at = clock.now();
       record(at);
-      return { id: `em-${at}`, scope: 'all', until: at + EMERGENCY_MS, source: 'emergency' };
+      const w = windowFrom(at);
+      uses.emit(w);
+      return w;
     },
     emergencyLeftToday: () => (usedToday() ? 0 : 1),
     log: () => [...entries],
     unlocksOn: (date) => entries.filter((t) => dayKey(t) === date),
+    activeWindow() {
+      const last = entries.at(-1);
+      if (last === undefined) return null;
+      const w = windowFrom(last);
+      return w.until > clock.now() ? w : null;
+    },
+    onUse: (fn) => uses.on(fn),
     reset() {
       entries = [];
       kv.remove(EMERGENCY_KEY);
