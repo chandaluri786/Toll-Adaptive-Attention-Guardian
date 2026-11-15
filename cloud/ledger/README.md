@@ -26,7 +26,7 @@
 
 ## Deploy (free tier: on-demand DynamoDB, HTTP API throttled to 10 rps / burst 20, 128 MB arm64 Lambda, 7-day logs)
 ```
-cd cloud/ledger && sam build && sam deploy     # settings in samconfig.toml: stack toll-ledger, us-west-2
-sam delete --stack-name toll-ledger             # teardown
+cd cloud/ledger && sam build && sam deploy     # settings in samconfig.toml: stack toll-ledger, us-east-2
+sam delete --stack-name toll-ledger --region us-east-2   # teardown (only us-east-2 is allowed by the org policy)
 ```
-Then put the `ApiUrl` output in `src/ledger/cloudConfig.ts` (`LEDGER_API_URL`).
+Live: `https://w73jkps50l.execute-api.us-east-2.amazonaws.com` (also `LEDGER_API_URL` in `src/ledger/cloudConfig.ts`).
