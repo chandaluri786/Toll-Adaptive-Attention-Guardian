@@ -98,6 +98,12 @@ export function createFakeLedger(get: GetServices) {
   return { services: { ledger }, debug };
 }
 
+/** Local `YYYY-MM-DD` (never UTC): a day means local time, so `toISOString()` would shift it. */
+function localDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Deterministic fake history (same every run) so Forecast screens and tests are stable. */
 export function generateHistory(days: number, now: number): DaySummary[] {
   let s = 42;
@@ -113,7 +119,7 @@ export function generateHistory(days: number, now: number): DaySummary[] {
     const trend = 1 - (days - i) / (days * 2); // slowly improving
     const restricted = Math.round((90 + rand() * 120) * trend);
     out.push({
-      date: d.toISOString().slice(0, 10),
+      date: localDate(d),
       restrictedMin: restricted,
       pastFreeMin: Math.max(0, restricted - 120),
       stormMin: Math.round(rand() * 90),
