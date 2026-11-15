@@ -83,7 +83,7 @@ export function longestAwayMinutes(samples: LocationSample[], home: { lat: numbe
 }
 
 /** Plain reason for why the latest sample does not count, or null if it does. */
-function locationMissReason(s: LocationSample | null, home: { lat: number; lon: number }): string | null {
+export function locationMissReason(s: LocationSample | null, home: { lat: number; lon: number }): string | null {
   if (!s) return 'Waiting for a location fix';
   if (s.mocked) return MOCKED_REASON;
   if (s.accuracyM > MAX_ACCURACY_M) return 'Location is fuzzy right now — try somewhere with open sky';
