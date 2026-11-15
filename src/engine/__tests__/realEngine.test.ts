@@ -107,7 +107,7 @@ describe('createRealEngine + wireLedger with fakes of A and B', () => {
     const graced = h.services.postureSource.get();
 
     // Assert
-    expect(graced).toMatchObject({ posture: 'sealed', grace: true, reasonCode: 'schedule' });
+    expect(graced).toMatchObject({ posture: 'open', grace: true, reasonCode: 'schedule', nextChange: { to: 'sealed' } });
     expect(graced.reason).toContain("Storm until 11:00 — you're in Algorithms");
     expect(h.engine.debug.postureSource.enforced()).toBe('open');
     expect(h.pending).toHaveLength(1);
@@ -169,11 +169,11 @@ describe('createRealEngine + wireLedger with fakes of A and B', () => {
   });
 
   test('during the 90-s advisory the old weather still rules the ledger', () => {
-    // Arrange: Storm shown with grace, nothing enforced yet
+    // Arrange: Storm gathering, nothing enforced yet
     const h = setup(at(10, 0, 30));
     h.minute(2);
     h.ledger.debug.setBalance(30);
-    expect(h.services.postureSource.get()).toMatchObject({ posture: 'sealed', grace: true });
+    expect(h.services.postureSource.get()).toMatchObject({ posture: 'open', grace: true, nextChange: { to: 'sealed' } });
 
     // Act
     const result = h.services.ledger.spend(10, 'restricted');
@@ -224,13 +224,13 @@ describe('createRealEngine + wireLedger with fakes of A and B', () => {
   });
 
   test('history() carries Storm minutes, Restricted minutes, emergency unlocks and plan progress', () => {
-    // Arrange: Storm from 10:01:30 (shown) in Algorithms; 2 minutes of Instagram earlier
+    // Arrange: Storm gathering from 10:01:30 in Algorithms, enforced from 10:03:00; 2 minutes of Instagram earlier
     const h = setup(at(9, 58, 30));
     for (let i = 0; i < 120; i++) h.device.debug.emitSample();
     h.minute(3); // ticks at 09:59:30, 10:00:30, 10:01:30 (the last turns Storm)
 
     // Act
-    h.minute(5); // five more Storm minutes (the tick that turned Storm counts too: 6)
+    h.minute(5); // Storm is enforced once the 90 s of clouds gathering end at 10:03:00: 4 Storm minutes
     h.services.governor.emergencyUnlock();
     h.day.debug.passActive(); // plan 2 → 3 of 5
     const [today] = h.services.ledger.history(1);
@@ -238,7 +238,7 @@ describe('createRealEngine + wireLedger with fakes of A and B', () => {
     // Assert
     expect(today.date).toBe('2026-11-16');
     expect(today.restrictedMin).toBe(2);
-    expect(today.stormMin).toBe(6);
+    expect(today.stormMin).toBe(4);
     expect(today.emergencyUnlocks).toEqual([at(10, 6, 30)]);
     expect(today).toMatchObject({ tasksPlanned: 5, tasksDone: 3 });
     expect(today.questsByCategory).toEqual({ fitness: 1 });

@@ -59,9 +59,9 @@ describe('createPostureEngine', () => {
     h.tick(); // 10:00:30, reading 1
     expect(h.engine.get().posture).toBe('open');
     expect(h.engine.get().nextChange).toEqual({ at: at(10, 1, 30) + GRACE_MS, to: 'sealed' });
-    h.tick(); // 10:01:30, reading 2 → Storm with grace
+    h.tick(); // 10:01:30, reading 2 → Storm gathering: Clear still rules for 90 s
     const graced = h.engine.get();
-    expect(graced).toMatchObject({ posture: 'sealed', grace: true, reasonCode: 'schedule' });
+    expect(graced).toMatchObject({ posture: 'open', grace: true, reasonCode: 'schedule' });
     expect(graced.reason).toBe("Storm until 11:00 — you're in Algorithms.");
     expect(graced.nextChange).toEqual({ at: at(10, 1, 30) + GRACE_MS, to: 'sealed' });
     expect(h.engine.enforced()).toBe('open');
@@ -98,12 +98,13 @@ describe('createPostureEngine', () => {
     h.tick();
     h.tick();
     h.tick();
+    h.tick(); // the 90 s of clouds gathering are over
     expect(h.engine.get().posture).toBe('metered');
 
     h.config.set({ stormAt: 50 });
     expect(h.engine.get().posture).toBe('metered'); // nothing until the next reading
     h.tick();
-    expect(h.engine.get()).toMatchObject({ posture: 'sealed', grace: true });
+    expect(h.engine.get()).toMatchObject({ posture: 'metered', grace: true, nextChange: { to: 'sealed' } });
     expect(h.engine.get().reason).toBe("Storm until 16:00 — you're in Deep work.");
   });
 
@@ -132,7 +133,7 @@ describe('createPostureEngine', () => {
     h.setSnap(inClass);
     h.tick();
     h.tick();
-    expect(h.engine.get().posture).toBe('sealed');
+    expect(h.engine.get()).toMatchObject({ grace: true, nextChange: { to: 'sealed' } });
     h.engine.reset();
     expect(h.engine.get()).toMatchObject({ posture: 'open', grace: false });
     expect(h.seen.at(-1)?.posture).toBe('open');

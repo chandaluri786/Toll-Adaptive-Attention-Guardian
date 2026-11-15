@@ -104,6 +104,17 @@ describe('1.8 Clouds gathering (90-second warning)', () => {
   });
 });
 
+describe('1.8 Clouds gathering while the weather already restricts the app', () => {
+  // The blocker only intercepts when the current weather restricts the app, so the screen must show
+  // that weather's choices; a banner alone left an empty white screen on the phone.
+  const vm = stormViewModel({ ...base, grace: true, graceLeft: 36, reason: "Storm until 11:00 — you're in Algorithms." });
+  it('shows the Cloudy screen with its doors, plus the banner', () => {
+    expect(vm.mode).toBe('cloudy');
+    expect(vm.doors.map((d) => d.key)).toEqual(['wait', 'umbrella', 'quest']);
+    expect(vm.gather).toEqual({ title: 'Clouds gathering · 0:36', body: "Storm until 11:00 — you're in Algorithms." });
+  });
+});
+
 describe('other details', () => {
   it('a discretionary app in a Storm can be opened with umbrella time at double cost', () => {
     const vm = stormViewModel({ ...base, posture: 'sealed', balance: 30, decision: { kind: 'intercept', canSpend: true, spendRate: 2, questPrimary: false } });

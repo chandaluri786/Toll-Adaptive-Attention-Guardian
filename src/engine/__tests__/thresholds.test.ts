@@ -136,6 +136,8 @@ describe('a threshold edit reaches the real engine on its next reading', () => {
     };
     minute();
     minute();
+    minute();
+    minute(); // the 90 s of clouds gathering are over, so Cloudy is in force
     const before = services.postureSource.get();
 
     // Act

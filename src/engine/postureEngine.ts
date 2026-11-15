@@ -53,7 +53,8 @@ export function createPostureEngine({ clock, snapshot, config, monotonic = clock
   const compose = (): PostureState => {
     const cfg = config.get();
     const nextChange = nextChangeOf(machine, cfg) ?? scheduleChange(machine, last, cfg);
-    const base = { posture: machine.posture, nextChange, grace: machine.graceUntil !== null, computedAt: monotonic() };
+    // During the 90-s advisory the published weather is the one still enforced; nextChange and the reason say what is gathering.
+    const base = { posture: enforcedPosture(machine), nextChange, grace: machine.graceUntil !== null, computedAt: monotonic() };
     if (!last) {
       return { ...base, score: 0, reason: "Sky's clear. Enjoy it.", reasonCode: 'none', allowanceLeftMin: FREE_TIME_MIN };
     }

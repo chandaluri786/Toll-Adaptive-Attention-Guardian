@@ -7,7 +7,7 @@
 //
 // Strict order (planning doc, UI): 1. the weather and why  2. umbrella time  3. the choices.
 // The mascot is deliberately NOT here: on this screen it stays out of the way.
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Posture } from '../../contracts';
 import { WeatherChip, useSky, useTheme, useThemeMode } from '../../ui/components';
@@ -48,6 +48,7 @@ export function StormView(p: StormViewProps) {
 function Block({ vm, posture, emergencyStep, topInset = 0, onDoor, onEmergency, onOpenApp, mode }: StormViewProps & { mode: 'light' | 'dark' }) {
   const t = useTheme();
   const sky = useSky(posture);
+  const [bannerHidden, setBannerHidden] = useState(false);
   const storm = posture === 'sealed';
   const waitFill = vm.doors.find((d) => d.key === 'wait')?.fill ?? 0;
   const calm = storm ? waitFill : 0; // the Storm settles while you wait
@@ -109,6 +110,8 @@ function Block({ vm, posture, emergencyStep, topInset = 0, onDoor, onEmergency, 
         {vm.mode !== 'clear' && <EmergencyLink vm={vm} step={emergencyStep} onAction={onEmergency} posture={posture} />}
       </View>
 
+      {/* Over a screen that already has choices, dismissing only hides the banner. */}
+      {vm.gather && !bannerHidden && <GatherBanner title={vm.gather.title} body={vm.gather.body} topInset={topInset} onDismiss={() => setBannerHidden(true)} />}
       {emergencyStep === 'confirming' && <ConfirmDialog onAction={onEmergency} />}
     </View>
   );

@@ -64,7 +64,7 @@ export type StormViewModel = {
   umbrella: { minutes: number; note: string };
   doors: Door[];
   emergency: { label: string; available: boolean };
-  /** The clouds-gathering banner (mode 'grace' only). */
+  /** The clouds-gathering banner: alone in mode 'grace', over the Cloudy screen when it already restricts. */
   gather: { title: string; body: string } | null;
 };
 
@@ -102,15 +102,18 @@ export function stormViewModel(i: StormInput): StormViewModel {
     emergency,
   };
 
-  // Clouds gathering: a warning only. No doors: nothing is restricted until the advisory ends.
-  if (i.grace) {
+  const gather = i.grace ? { title: `Clouds gathering · ${mmss(i.graceLeft ?? 90)}`, body: i.reason } : null;
+
+  // Clouds gathering from Clear skies: a warning only. No doors: nothing is restricted until the advisory ends.
+  // From a weather that already restricts (Cloudy), that weather's screen stays, with the banner on top.
+  if (gather && i.posture === 'open') {
     return {
       ...base,
       mode: 'grace',
       weatherName: 'Clouds gathering',
       note: null,
       doors: [],
-      gather: { title: `Clouds gathering · ${mmss(i.graceLeft ?? 90)}`, body: i.reason },
+      gather,
     };
   }
 
@@ -168,7 +171,7 @@ export function stormViewModel(i: StormInput): StormViewModel {
     weatherName: storm ? 'Storm' : 'Cloudy',
     note: i.trigger === 'expired' ? 'Your umbrella time just ran out.' : null,
     doors,
-    gather: null,
+    gather,
   };
 }
 
