@@ -12,24 +12,36 @@ import type { InstalledAppsPort, Notifier, PermissionId, PermissionStatus, Permi
 
 // ---- permissions -----------------------------------------------------------------------------
 
+const granted = (check: Promise<{ granted: boolean }>): Promise<boolean> =>
+  check.then(
+    (r) => r.granted,
+    (e) => {
+      console.warn('[toll] permission check failed', e);
+      return false;
+    },
+  );
+
 export function createNativePermissions(): PermissionsPort {
   return {
     async status(): Promise<PermissionStatus> {
       // Usage access, overlay and notifications come from the blocker; the rest from their Expo modules.
+      // The optional checks are settled one by one: if one of them throws, it reads as "not granted"
+      // instead of failing the whole check, which would hide a revoked overlay / usage access from the
+      // fail-open guard (an unknown status is never a reason to open everything).
       const blocker = await getPermissionStatus();
       const android = blocker.details.platform === 'android' ? blocker.details : null;
       const [loc, cam, motion] = await Promise.all([
-        Location.getForegroundPermissionsAsync(),
-        Camera.getCameraPermissionsAsync(),
-        Pedometer.getPermissionsAsync(),
+        granted(Location.getForegroundPermissionsAsync()),
+        granted(Camera.getCameraPermissionsAsync()),
+        granted(Pedometer.getPermissionsAsync()),
       ]);
       return {
         usage: android?.usageStats ?? false,
         overlay: android?.overlay ?? false,
         notifications: android?.notifications ?? false,
-        location: loc.granted,
-        camera: cam.granted,
-        motion: motion.granted,
+        location: loc,
+        camera: cam,
+        motion,
       };
     },
 
