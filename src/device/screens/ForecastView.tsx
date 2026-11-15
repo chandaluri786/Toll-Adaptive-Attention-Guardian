@@ -4,14 +4,14 @@
 // this working?" is more persuasive than gamification. The empty state carries the sleepy mascot.
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { DaySummary, TaskType } from '../../contracts';
+import type { TaskType } from '../../contracts';
 import { useTheme } from '../../ui/components';
 import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
 import { Icon, type IconName } from '../../ui/Icon';
 import { Mascot } from '../../ui/Mascot';
 import { Body, Card, Display, MiniBars, SectionLabel, Segmented } from '../../ui/primitives';
 import { fonts, radius, space } from '../../ui/theme';
-import { RANGES, calendarRows, monthName, weekdayLetter, type DayIcon, type ForecastModel, type GoalBar, type Range } from '../forecast';
+import { RANGES, monthName, weekdayLetter, type DayIcon, type ForecastModel, type GoalBar, type Range } from '../forecast';
 import { fmtClock } from '../notifications';
 
 const DAY_ICON: Record<DayIcon, { icon: IconName; label: string }> = {
@@ -187,56 +187,74 @@ function Calendar({ model }: { model: Extract<ForecastModel, { state: 'ready' }>
     );
   }
 
+  // Month and 6 months: calendar grids, Monday first, one grid per calendar month, as in the design.
+  const lastDate = model.days[model.days.length - 1].date;
+  const months = [...new Set(model.days.map((d) => d.date.slice(0, 7)))];
+  const grid = (ym: string, big: boolean) => <MonthGrid key={ym} ym={ym} iconOf={iconOf} lastDate={lastDate} big={big} />;
+
   if (model.range === 'month') {
-    const first = model.days[0].date;
-    const rows = calendarRows(model.days);
-    return (
-      <View style={{ gap: 6, marginVertical: 6 }}>
-        <Text style={{ color: t.muted, fontSize: 14, fontFamily: fonts.body }}>{`${monthName(first)} ${first.slice(0, 4)}`}</Text>
+    // The calendar month of the latest day; days that have not happened yet are faint numbers.
+    return <View style={{ marginVertical: 6 }}>{grid(lastDate.slice(0, 7), true)}</View>;
+  }
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 18, marginVertical: 6 }}>
+      {months.map((ym) => (
+        <View key={ym} style={{ width: '50%', paddingRight: 10 }}>
+          {grid(ym, false)}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Days in a calendar month, as 'YYYY-MM-DD'. */
+const monthDates = (ym: string) => {
+  const [y, m] = ym.split('-').map(Number);
+  const count = new Date(y, m, 0).getDate();
+  return Array.from({ length: count }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`);
+};
+
+/**
+ * One month as 7 columns (Mon to Sun). `big` is the Month tab: weekday letters and a number under each
+ * icon. Small is the 6 months tab: just tiny icons. Days after `lastDate` have not happened: a faint
+ * number (big) or a dot (small). Days before the first recorded day are left blank.
+ */
+function MonthGrid({ ym, iconOf, lastDate, big }: { ym: string; iconOf: Map<string, DayIcon>; lastDate: string; big: boolean }) {
+  const t = useTheme();
+  const dates = monthDates(ym);
+  const lead = (new Date(`${dates[0]}T12:00:00`).getDay() + 6) % 7; // Monday = 0
+  const cells: (string | null)[] = [...Array<null>(lead).fill(null), ...dates];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+  return (
+    <View style={{ gap: big ? 6 : 3 }}>
+      <Text style={{ color: t.muted, fontSize: 14, fontFamily: fonts.body, marginBottom: 2 }}>{big ? `${monthName(dates[0])} ${ym.slice(0, 4)}` : monthName(dates[0]).slice(0, 3)}</Text>
+      {big && (
         <View style={{ flexDirection: 'row' }}>
           {'MTWTFSS'.split('').map((c, i) => (
             <Text key={i} style={{ flex: 1, textAlign: 'center', color: t.muted, fontSize: 12, fontFamily: fonts.body }}>{c}</Text>
           ))}
         </View>
-        {rows.map((row, r) => (
-          <View key={r} style={{ flexDirection: 'row' }}>
-            {row.map((d, c) =>
-              d ? (
-                <View key={d.date} accessible accessibilityLabel={`${d.date}: ${DAY_ICON[iconOf.get(d.date)!].label}`} style={{ flex: 1, alignItems: 'center', gap: 2, paddingVertical: 3 }}>
-                  <DayGlyph icon={iconOf.get(d.date)!} size={18} />
-                  <Text style={{ color: t.faint, fontSize: 10, fontFamily: fonts.body }}>{Number(d.date.slice(8))}</Text>
-                </View>
-              ) : (
-                <View key={`b${c}`} style={{ flex: 1 }} />
-              ),
-            )}
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  // 6 months: one block of dots per month, two blocks per row
-  const byMonth = new Map<string, DaySummary[]>();
-  model.days.forEach((d) => byMonth.set(d.date.slice(0, 7), [...(byMonth.get(d.date.slice(0, 7)) ?? []), d]));
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, marginVertical: 6 }}>
-      {[...byMonth.entries()].map(([ym, ds]) => (
-        <View key={ym} style={{ width: '50%', gap: 6 }}>
-          <Text style={{ color: t.muted, fontSize: 14, fontFamily: fonts.body }}>{monthName(`${ym}-15`).slice(0, 3)}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, paddingRight: 12 }}>
-            {ds.map((d) => {
-              const icon = iconOf.get(d.date)!;
-              return (
-                <View
-                  key={d.date}
-                  accessible
-                  accessibilityLabel={`${d.date}: ${DAY_ICON[icon].label}`}
-                  style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: icon === 'sun' ? t.gold : icon === 'partly' ? t.free : t.faint, opacity: icon === 'storm' ? 0.6 : 1 }}
-                />
-              );
-            })}
-          </View>
+      )}
+      {rows.map((row, r) => (
+        <View key={r} style={{ flexDirection: 'row' }}>
+          {row.map((date, c) => {
+            const icon = date ? iconOf.get(date) : undefined;
+            const future = !!date && date > lastDate;
+            return (
+              <View
+                key={date ?? `b${r}-${c}`}
+                accessible={!!icon}
+                accessibilityLabel={date && icon ? `${date}: ${DAY_ICON[icon].label}` : undefined}
+                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: big ? 42 : 17, gap: 2 }}
+              >
+                {icon && <DayGlyph icon={icon} size={big ? 20 : 13} />}
+                {icon && big && <Text style={{ color: t.muted, fontSize: 11, fontFamily: fonts.body }}>{Number(date!.slice(8))}</Text>}
+                {future && big && <Text style={{ color: t.faint, fontSize: 14, fontFamily: fonts.body }}>{Number(date!.slice(8))}</Text>}
+                {future && !big && <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: t.faint }} />}
+              </View>
+            );
+          })}
         </View>
       ))}
     </View>
@@ -267,8 +285,16 @@ function Hatched({ height, color }: { height: number; color: string }) {
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** One bar per day: the outline is what was planned, the gold fill is what got done. No plan = a faded bar. */
-function GoalChart({ bars }: { bars: GoalBar[] }) {
+function GoalChart({ bars: daily }: { bars: GoalBar[] }) {
   const t = useTheme();
+  // Over a month, 90+ thin bars turn into noise: group them by week (planned and done are summed).
+  const bars: GoalBar[] =
+    daily.length <= 31
+      ? daily
+      : Array.from({ length: Math.ceil(daily.length / 7) }, (_, i) => {
+          const wk = daily.slice(i * 7, i * 7 + 7);
+          return { date: wk[0].date, planned: wk.reduce((a, b) => a + b.planned, 0), done: wk.reduce((a, b) => a + b.done, 0), hasPlan: wk.some((b) => b.hasPlan) };
+        });
   const max = Math.max(4, ...bars.map((b) => Math.max(b.planned, b.done)));
   const H = 110;
   return (

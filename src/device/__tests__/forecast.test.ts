@@ -158,11 +158,11 @@ describe('forecastModel', () => {
     expect(m.sunny).toEqual({ label: 'This month', headline: '30 sunny days out of 30.' });
   });
 
-  it('six months compares 90 days with the 90 before, using the 180 days the ledger keeps', () => {
+  it('six months shows all 180 days and compares the last 90 with the 90 before', () => {
     expect(historyNeeded('six_months')).toBe(180);
     const m = forecastModel('six_months', run(180));
     if (m.state !== 'ready') throw new Error('expected ready');
-    expect(m.days).toHaveLength(90);
+    expect(m.days).toHaveLength(180); // everything the ledger keeps
     expect(m.sunny.label).toMatch(/^Since [A-Z][a-z]+$/);
     expect(m.trend).toBe('About the same distracting time a day as the three months before.');
   });

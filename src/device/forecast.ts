@@ -171,10 +171,14 @@ export function forecastModel(range: Range, history: readonly DaySummary[]): For
     };
   }
   const n = RANGES.find((r) => r.id === range)!.days;
-  const days = history.slice(-n);
+  // "6 months" shows every day the ledger keeps (180), as in the design, but still compares the last 90
+  // days with the 90 before them, so the trend and goals sentences keep an honest like-for-like comparison.
+  const days = history.slice(range === 'six_months' ? -2 * n : -n);
+  const recent = history.slice(-n);
   const previous = history.slice(-2 * n, -n);
   const hasPrevious = previous.length >= MIN_DAYS_FOR_FORECAST;
   const summary = summarizeRange(days);
+  const recentSummary = summarizeRange(recent);
   const sunnyWord = summary.sunnyDays === 1 ? 'sunny day' : 'sunny days';
   const sunny =
     range === 'week'
@@ -190,10 +194,10 @@ export function forecastModel(range: Range, history: readonly DaySummary[]): For
     summary,
     sunny,
     goals: {
-      headline: goalsSentence(completionRate(days), hasPrevious ? completionRate(previous) : null),
+      headline: goalsSentence(completionRate(recent), hasPrevious ? completionRate(previous) : null),
       bars: days.map((d) => ({ date: d.date, planned: d.tasksPlanned ?? 0, done: Math.min(d.tasksDone, d.tasksPlanned ?? d.tasksDone), hasPlan: d.tasksPlanned !== null })),
     },
-    trend: trendSentence(range, summary.avgRestrictedMin, hasPrevious ? summarizeRange(previous).avgRestrictedMin : null),
+    trend: trendSentence(range, recentSummary.avgRestrictedMin, hasPrevious ? summarizeRange(previous).avgRestrictedMin : null),
     categories: questsByCategory(days),
     icons: days.map(dayIcon),
   };
