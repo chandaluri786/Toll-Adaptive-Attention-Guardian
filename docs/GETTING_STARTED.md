@@ -37,6 +37,10 @@ Your spec is in [`docs/specs/`](specs/): [A-device.md](specs/A-device.md), [B-da
 3. Read `src/contracts.ts` aloud together. It's the only connection between our three parts. Any change happens now, by all three of us. **At 1:30 it's frozen.**
 4. Put your GitHub handles in `.github/CODEOWNERS` and uncomment the lines.
 
+## Design and previewing without a phone
+
+Build every screen from its reference image in `docs/design/` and follow [DESIGN.md](DESIGN.md). Run `npm run web` to see your screen in a browser and compare it with the image.
+
 ## How we work
 
 - Only edit your own folders. `src/contracts.ts`, `src/services.ts`, `src/shared/` and `src/app/` are shared and frozen. Changing them needs all three of us in one commit.

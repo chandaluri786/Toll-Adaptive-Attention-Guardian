@@ -9,6 +9,10 @@ The doc is the single source for product rules (numbers, thresholds, copy). This
 
 **New to the team? Start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**: setup, hour-0 steps, where each person starts, the timeline and integration.
 
+## Design
+
+Every screen must match the approved design. The rules (colours, type, icons, the cloud mascot, motion, copy) and a screen-to-owner map live in **[docs/DESIGN.md](docs/DESIGN.md)**; reference images of every state are in [`docs/design/`](docs/design/). Shared UI is in `src/ui/` (owned by A): import it, do not copy it.
+
 ## Quick start
 
 ```bash
@@ -16,6 +20,15 @@ npm install
 npm run check        # typecheck + tests, must stay green on main
 npm run android      # dev build on a connected Android phone (Expo Go will not work: native modules)
 ```
+
+### Without an Android phone
+
+```bash
+npm run web            # dev server with hot reload (react-native-web)
+npm run preview:web    # export once and serve at http://localhost:4173
+```
+
+The native blocker, usage stats and sensors only exist on Android, so the web preview runs on the fakes. It is for looking at screens and trying the flows, not for proving the real blocker.
 
 The app runs entirely on **fakes** until each owner flips their flag, so every screen works from day one.
 
