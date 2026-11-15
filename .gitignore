@@ -45,3 +45,6 @@ yarn-error.*
 
 # web export
 /dist-web
+
+# Gradle output from local Expo modules
+modules/*/android/build/
