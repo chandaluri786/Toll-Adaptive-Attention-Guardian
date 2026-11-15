@@ -24,6 +24,8 @@ Pure logic is kept out of components: `policy.ts`, `enforcer.ts`, `usageMeter.ts
 
 - `expo-app-blocker` has no foreground-app event stream, so time spent in an unlocked app is measured by the unlock-budget meter (`usageMeter.ts`) instead.
 - Screen on/off and background location are not available from the blocker's service type (see `native/signals.ts`).
+- The blocker's ongoing foreground-service notification ("App Blocker / Monitoring blocked apps", id 9001) is fixed text in the package's native code. `setNotificationText` only sets the notification posted on each intercept (id 9002, channel `expo_app_blocker_blocked`, which `native/ports.ts` turns down to LOW so it is not a heads-up). Changing 9001 needs a patch to the package.
+- JS timers stop while Toll is in the background (Android pauses React Native's timers with the Activity), so the permission check and fail-open run when Toll comes back to the front. If "Display over apps" is revoked while Toll stays in the background, the native service keeps intercepting and its overlay throws `BadTokenException` until then (the blocked app stays usable, so it still fails open). A deliberate fix needs the package's service to check `Settings.canDrawOverlays` before showing the overlay.
 
 ## See it without a phone
 
