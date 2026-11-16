@@ -2,11 +2,17 @@
 // src/services.ts and the fakes behave the way the specs promise. Keep this green on main.
 import services, { debug } from '../services';
 
+// Midday today: umbrella time costs 2× from 23:00 to 04:00 (C11), so the wall clock must not decide the result.
+const NOON = new Date(new Date().setHours(12, 0, 0, 0)).getTime();
+
 beforeEach(() => {
   debug.engine.reset();
   debug.ledger.reset();
   debug.day.reset();
+  debug.engine.clock.setNow(NOON);
 });
+
+afterAll(() => debug.engine.clock.resetNow());
 
 test('every interface in the contract is wired', () => {
   for (const key of ['clock', 'postureSource', 'governor', 'ledger', 'usageFeed', 'deviceSignals', 'planner', 'quests'] as const) {
